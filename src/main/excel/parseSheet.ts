@@ -55,6 +55,17 @@ function asNumber(v: unknown): number {
   return n;
 }
 
+/**
+ * 헤더 비교용 정규화.
+ *
+ * NDSD 포털이 배포하는 .xls 양식과 서버가 생성하는 .xlsx 양식이 컬럼명 표기가 달라서
+ * ("처방전-보험등재구분" vs "처방전보험등재구분" vs "처방전 보험등재구분") 단순 비교는 실패한다.
+ * 공백·하이픈·언더스코어·괄호 등 구분 기호를 모두 제거한 뒤 비교하므로 표기 변형을 모두 허용.
+ */
+function normalizeHeader(s: string): string {
+  return s.replace(/[\s\-_·.()\[\]{}\/\\]+/g, '');
+}
+
 /** 2D 배열(헤더 포함)을 NdsdBatchRow[] 로 검증·변환. */
 function matrixToRows(matrix: unknown[][]): NdsdBatchRow[] {
   if (matrix.length === 0) throw new Error('엑셀 파일이 비어 있습니다.');
@@ -62,7 +73,7 @@ function matrixToRows(matrix: unknown[][]): NdsdBatchRow[] {
   const headers = matrix[0] ?? [];
   for (let i = 0; i < EXPECTED_HEADERS.length; i++) {
     const actual = asString(headers[i]);
-    if (actual !== EXPECTED_HEADERS[i]) {
+    if (normalizeHeader(actual) !== normalizeHeader(EXPECTED_HEADERS[i])) {
       throw new Error(
         `헤더가 NDSD 양식과 다릅니다. ${i + 1}번째 컬럼 기대: "${EXPECTED_HEADERS[i]}" / 실제: "${actual}"`,
       );
