@@ -1,5 +1,9 @@
 /**
- * pharmsq.com 에 배포된 `manifest.json` 을 주기적으로 조회하고 캐싱한다.
+ * 업데이트 피드 URL 관리 + manifest.json 주기적 조회·캐싱.
+ *
+ * 피드 구조 (GitHub Releases 기반):
+ *   - Squirrel feed  : {FEED_BASE}/RELEASES, {FEED_BASE}/*.nupkg
+ *   - manifest.json  : raw.githubusercontent.com 의 deploy/manifest.json
  *
  * - HTTPS GET + 5초 타임아웃
  * - 응답 파싱 실패/네트워크 실패 시 마지막 성공 캐시 유지 (오프라인 허용)
@@ -8,14 +12,21 @@
 import axios from 'axios';
 import type { UpdateManifest } from '../../shared/update';
 
-const DEFAULT_FEED_BASE = 'https://pharmsq.com/ndsd-uploader';
+const DEFAULT_FEED_BASE =
+  'https://github.com/guinnessNet/pharmsq-ndsd/releases/latest/download';
+
+const DEFAULT_MANIFEST_URL =
+  'https://raw.githubusercontent.com/guinnessNet/pharmsq-ndsd/main/deploy/manifest.json';
 
 export function getFeedBaseUrl(): string {
   return process.env.NDSD_UPDATE_FEED_URL?.trim() || DEFAULT_FEED_BASE;
 }
 
 export function getManifestUrl(): string {
-  return `${getFeedBaseUrl()}/manifest.json`;
+  if (process.env.NDSD_UPDATE_FEED_URL?.trim()) {
+    return `${process.env.NDSD_UPDATE_FEED_URL.trim()}/manifest.json`;
+  }
+  return DEFAULT_MANIFEST_URL;
 }
 
 let cached: { manifest: UpdateManifest; fetchedAt: number } | null = null;
@@ -48,7 +59,6 @@ export async function fetchManifest(): Promise<UpdateManifest> {
   const url = getManifestUrl();
   const res = await axios.get(url, {
     timeout: 5000,
-    // 캐시 무력화 — 서버는 Cache-Control no-cache 지정하지만 프록시 보호용
     headers: { 'Cache-Control': 'no-cache' },
     responseType: 'json',
   });

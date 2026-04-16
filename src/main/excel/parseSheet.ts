@@ -137,7 +137,11 @@ async function parseWithExcelJs(filePath: string, ext: SupportedExt): Promise<un
 }
 
 function parseWithSheetJs(filePath: string): unknown[][] {
-  const wb = XLSX.readFile(filePath, { cellDates: false, cellFormula: false });
+  // webpack 번들 환경에서 SheetJS 의 내부 _fs 가 undefined 가 되어 readFile 이
+  // "Cannot access file" 에러를 던짐. fs.readFileSync 로 직접 읽어 XLSX.read 사용.
+  const fs = require('fs') as typeof import('fs');
+  const buf = fs.readFileSync(filePath);
+  const wb = XLSX.read(buf, { type: 'buffer', cellDates: false, cellFormula: false });
   const name = wb.SheetNames[0];
   if (!name) throw new Error('엑셀 파일에 시트가 없습니다.');
   const ws = wb.Sheets[name];

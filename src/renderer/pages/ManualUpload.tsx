@@ -223,8 +223,7 @@ export default function ManualUpload(): React.ReactElement {
       </div>
 
       <div style={styles.footer}>
-        <FooterItem label="ORIGIN SYSTEM" value="HIRA Central Clinical Node" dot />
-        <FooterItem label="DATA INTEGRITY" value="Verified 98%" dot />
+        <FooterItem label="지원 형식" value="xlsx / xlsm / xls / csv" dot />
         {stage === 'picked' && (
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
             <button style={button.ghost} onClick={reset}>

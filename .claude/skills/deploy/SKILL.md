@@ -104,7 +104,7 @@ npm run make
 ```
 
 산출물은 `out/make/squirrel.windows/x64/` 에:
-- `pharmsq-ndsd-<ver> Setup.exe`
+- `pharmsq-ndsd-Setup.exe` (버전 미포함 — forge.config.ts setupExe 설정)
 - `pharmsq_ndsd-<ver>-full.nupkg`
 - `RELEASES`
 
@@ -150,7 +150,17 @@ GitHub Releases 페이지 열어 자산 3개 확인:
 gh release view pharmsq-ndsd-v<ver>
 ```
 
-운영 피드(`https://pharmsq.com/ndsd-uploader`) 반영은 별도 rsync/CI 절차 — 이 스킬 범위 밖. `CLAUDE.md` 의 "운영 승격 절차" 참조.
+### 업데이트 피드 구조 (GitHub 기반)
+
+릴리즈 완료 시 **별도 서버 배포 불필요.** 모든 피드가 GitHub 에서 직접 서빙됨.
+
+| 용도 | URL | 갱신 시점 |
+|---|---|---|
+| **Squirrel feed** (nupkg/RELEASES) | `https://github.com/guinnessNet/pharmsq-ndsd/releases/latest/download/` | `release.sh` 가 자산 업로드 시 자동 |
+| **manifest.json** (버전가드·minVersion) | `https://raw.githubusercontent.com/guinnessNet/pharmsq-ndsd/main/deploy/manifest.json` | `git push origin main` 시 자동 |
+
+- 로컬 개발 피드 오버라이드: `NDSD_UPDATE_FEED_URL` 환경변수 (`.local-feed/launch.bat` 이 주입)
+- `deploy/manifest.json` 을 커밋하면 **즉시** raw.githubusercontent 에 반영됨 — 1시간 내 사용자 앱이 감지
 
 ---
 
