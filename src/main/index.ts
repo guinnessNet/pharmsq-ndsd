@@ -111,7 +111,7 @@ ipcMain.on(PAYLOAD_FETCH, async () => {
   } satisfies PayloadResultPayload);
 });
 
-ipcMain.on(UPLOAD_START, async () => {
+ipcMain.on(UPLOAD_START, async (_event, payload?: { delayReason?: string }) => {
   const win = getMainWindow();
   if (!win || !cachedJobSpec) {
     win?.webContents.send(UPLOAD_ERROR, {
@@ -119,7 +119,6 @@ ipcMain.on(UPLOAD_START, async () => {
     } satisfies UploadErrorPayload);
     return;
   }
-  // T7 버전가드: minVersion 미만 차단 (runJob 진입 전에 선검사)
   const { isUploadBlocked } = await import('./update/versionGuard');
   if (isUploadBlocked()) {
     win.webContents.send(UPLOAD_ERROR, {
@@ -131,7 +130,7 @@ ipcMain.on(UPLOAD_START, async () => {
 
   const spec = cachedJobSpec;
   cachedJobSpec = null;
-  await runJob({ jobSpec: spec, win, moduleVersion: MODULE_VERSION });
+  await runJob({ jobSpec: spec, win, moduleVersion: MODULE_VERSION, delayReason: payload?.delayReason });
 });
 
 // ── Deep Link 처리 ───────────────────────────────────────────────────────────

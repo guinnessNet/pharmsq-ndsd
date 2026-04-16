@@ -26,6 +26,8 @@ export interface NdsdAutomationExports {
     moduleVersion: string;
     onProgress?: AutomationUploadParams['onProgress'];
     loginWindow: LoginWindowControl;
+    signal?: AbortSignal;
+    delayReason?: string;
   }): Promise<CallbackRequest>;
 }
 
@@ -45,6 +47,8 @@ export function createRealDriver(pkg: NdsdAutomationExports): AutomationDriver {
         moduleVersion: params.moduleVersion,
         onProgress: params.onProgress,
         loginWindow: params.loginWindow,
+        signal: params.signal,
+        delayReason: params.delayReason,
       });
     },
   };

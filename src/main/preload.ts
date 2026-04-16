@@ -13,6 +13,7 @@ import {
   UPLOAD_PROGRESS,
   UPLOAD_COMPLETE,
   UPLOAD_ERROR,
+  UPLOAD_CANCEL,
   CERT_REQUEST,
   CERT_SELECTED,
   CERT_CANCELLED,
@@ -62,7 +63,8 @@ function onChannel<T>(
 const api = {
   // 기존 업로드 플로우
   fetchPayload: () => ipcRenderer.send(PAYLOAD_FETCH),
-  startUpload: () => ipcRenderer.send(UPLOAD_START),
+  startUpload: (payload?: { delayReason?: string }) => ipcRenderer.send(UPLOAD_START, payload),
+  cancelUpload: () => ipcRenderer.send(UPLOAD_CANCEL),
 
   onDeepLinkReceived: (cb: (payload: DeepLinkReceivedPayload | DeepLinkErrorPayload) => void) =>
     onChannel(DEEPLINK_RECEIVED, cb),
@@ -115,7 +117,7 @@ const api = {
       return '';
     }
   },
-  startManualUpload: () => ipcRenderer.send(MANUAL_START),
+  startManualUpload: (payload?: { delayReason?: string }) => ipcRenderer.send(MANUAL_START, payload),
 
   // 자동 업데이트
   getUpdateStatus: (): Promise<UpdateStatus> => ipcRenderer.invoke(UPDATE_GET_STATUS),

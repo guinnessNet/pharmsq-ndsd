@@ -27,6 +27,14 @@ export const UPLOAD_COMPLETE = 'upload:complete';
 /** main → renderer: 업로드 오류 */
 export const UPLOAD_ERROR = 'upload:error';
 
+/** renderer → main: 업로드 취소 요청 */
+export const UPLOAD_CANCEL = 'upload:cancel';
+
+/** UPLOAD_START / MANUAL_START 페이로드 */
+export interface UploadStartPayload {
+  delayReason?: string;
+}
+
 /** main → renderer: 인증서 선택 요청 (비공개 패키지가 NPKI 스캔 후 전달한 후보) */
 export const CERT_REQUEST = 'cert:request';
 
@@ -177,7 +185,7 @@ export interface CertSavePayload {
 }
 
 export type ManualPickResult =
-  | { ok: true; filePath: string; rowCount: number }
+  | { ok: true; filePath: string; rowCount: number; delayedRowCount: number }
   | { ok: false; error: string };
 
 // ─── 자동 업데이트 ─────────────────────────────────────────────────────────

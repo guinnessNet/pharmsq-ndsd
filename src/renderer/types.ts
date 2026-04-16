@@ -20,7 +20,8 @@ declare global {
   interface Window {
     ndsdUploader: {
       fetchPayload: () => void;
-      startUpload: () => void;
+      startUpload: (payload?: { delayReason?: string }) => void;
+      cancelUpload: () => void;
       onDeepLinkReceived: (
         cb: (payload: DeepLinkEvent) => void,
       ) => () => void;
@@ -61,7 +62,7 @@ declare global {
       pickManualFile: () => Promise<ManualPickResult>;
       dropManualFile: (filePath: string) => Promise<ManualPickResult>;
       getDroppedFilePath: (file: File) => string;
-      startManualUpload: () => void;
+      startManualUpload: (payload?: { delayReason?: string }) => void;
       getUpdateStatus: () => Promise<UpdateStatus>;
       checkForUpdates: () => Promise<UpdateStatus>;
       applyUpdate: () => Promise<void>;

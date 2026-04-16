@@ -146,12 +146,15 @@ export default function App(): React.ReactElement {
     };
   }, []);
 
-  const handleConfirm = useCallback(() => {
+  const handleConfirm = useCallback((delayReason?: string) => {
     dispatch({ type: 'SET_PAGE', page: 'progress' });
-    window.ndsdUploader.startUpload();
+    window.ndsdUploader.startUpload(delayReason ? { delayReason } : undefined);
   }, []);
   const handleClose = useCallback(() => window.close(), []);
   const handleRetry = useCallback(() => dispatch({ type: 'CLEAR_ERROR' }), []);
+  const handleCancel = useCallback(() => {
+    window.ndsdUploader.cancelUpload();
+  }, []);
   const closeCertModal = useCallback(() => dispatch({ type: 'CLEAR_CERT_REQUEST' }), []);
 
   const certModal = state.certRequest ? (
@@ -201,6 +204,7 @@ export default function App(): React.ReactElement {
             step={state.progress?.step ?? '처리 중...'}
             current={state.progress?.current ?? 0}
             total={state.progress?.total ?? 7}
+            onCancel={handleCancel}
           />
         );
       case 'result':

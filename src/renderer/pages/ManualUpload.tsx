@@ -18,6 +18,8 @@ export default function ManualUpload(): React.ReactElement {
   const [result, setResult] = useState<CallbackRequest | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [dragHover, setDragHover] = useState(false);
+  const [delayedCount, setDelayedCount] = useState(0);
+  const [delayReason, setDelayReason] = useState('');
 
   useEffect(() => {
     const b = window.ndsdUploader;
@@ -49,6 +51,7 @@ export default function ManualUpload(): React.ReactElement {
     }
     setFilePath(r.filePath);
     setRowCount(r.rowCount);
+    setDelayedCount(r.delayedRowCount);
     setStage('picked');
   };
 
@@ -74,6 +77,7 @@ export default function ManualUpload(): React.ReactElement {
     }
     setFilePath(r.filePath);
     setRowCount(r.rowCount);
+    setDelayedCount(r.delayedRowCount);
     setStage('picked');
   };
 
@@ -93,7 +97,7 @@ export default function ManualUpload(): React.ReactElement {
   const upload = () => {
     setStage('uploading');
     setProgress({ step: '시작 중...', cur: 0, total: 7 });
-    window.ndsdUploader.startManualUpload();
+    window.ndsdUploader.startManualUpload(delayReason.trim() ? { delayReason: delayReason.trim() } : undefined);
   };
 
   const reset = () => {
@@ -103,6 +107,8 @@ export default function ManualUpload(): React.ReactElement {
     setProgress(null);
     setResult(null);
     setError(null);
+    setDelayedCount(0);
+    setDelayReason('');
   };
 
   const pct = progress ? Math.round((progress.cur / progress.total) * 100) : 0;
@@ -168,8 +174,16 @@ export default function ManualUpload(): React.ReactElement {
               <div style={styles.progressBar}>
                 <div style={{ ...styles.progressFill, width: `${pct}%` }} />
               </div>
-              <div style={styles.progressMeta}>
-                {progress?.cur ?? 0} / {progress?.total ?? 7} · {pct}%
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <div style={styles.progressMeta}>
+                  {progress?.cur ?? 0} / {progress?.total ?? 7} · {pct}%
+                </div>
+                <button
+                  style={styles.cancelBtn}
+                  onClick={() => window.ndsdUploader.cancelUpload()}
+                >
+                  취소
+                </button>
               </div>
             </div>
           )}
@@ -222,6 +236,24 @@ export default function ManualUpload(): React.ReactElement {
         </div>
       </div>
 
+      {stage === 'picked' && delayedCount > 0 && (
+        <div style={styles.delaySection}>
+          <div style={styles.delayHeader}>
+            <span style={styles.delayBadge}>지연통보 {delayedCount}건</span>
+            <span style={{ fontSize: 12, color: color.onSurfaceVariant }}>
+              대체조제일로부터 2일 이상 경과한 행이 있습니다.
+            </span>
+          </div>
+          <input
+            type="text"
+            placeholder="지연통보 사유 입력 (예: 업무지연)"
+            value={delayReason}
+            onChange={(e) => setDelayReason(e.target.value)}
+            style={styles.delayInput}
+          />
+        </div>
+      )}
+
       <div style={styles.footer}>
         <FooterItem label="지원 형식" value="xlsx / xlsm / xls / csv" dot />
         {stage === 'picked' && (
@@ -229,7 +261,13 @@ export default function ManualUpload(): React.ReactElement {
             <button style={button.ghost} onClick={reset}>
               취소
             </button>
-            <button style={button.primary} onClick={upload}>
+            <button
+              style={{
+                ...button.primary,
+                ...(delayedCount > 0 && !delayReason.trim() ? { opacity: 0.5, pointerEvents: 'none' as const } : {}),
+              }}
+              onClick={upload}
+            >
               업로드
             </button>
           </div>
@@ -400,6 +438,17 @@ const styles: Record<string, React.CSSProperties> = {
     transition: 'width 0.3s ease',
   },
   progressMeta: { fontSize: 12, color: color.onSurfaceVariant },
+  cancelBtn: {
+    fontFamily: font.body,
+    fontSize: 12,
+    fontWeight: 600,
+    color: color.error,
+    background: 'transparent',
+    border: `1px solid ${color.error}`,
+    borderRadius: 6,
+    padding: '5px 16px',
+    cursor: 'pointer',
+  },
 
   doneBox: { padding: 20 },
   doneBadge: {
@@ -453,6 +502,40 @@ const styles: Record<string, React.CSSProperties> = {
     background: color.surfaceContainerLow,
     borderRadius: radius.md,
     padding: '4px 14px',
+  },
+
+  delaySection: {
+    background: '#FFF7ED',
+    border: '1px solid #FDBA74',
+    borderRadius: radius.md,
+    padding: '14px 18px',
+    marginTop: 16,
+  },
+  delayHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    marginBottom: 8,
+  },
+  delayBadge: {
+    background: '#F97316',
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: 700,
+    padding: '3px 10px',
+    borderRadius: 999,
+    flexShrink: 0,
+  },
+  delayInput: {
+    width: '100%',
+    padding: '8px 12px',
+    fontSize: 13,
+    fontFamily: font.body,
+    border: '1.5px solid #FDBA74',
+    borderRadius: 6,
+    background: '#fff',
+    outline: 'none',
+    boxSizing: 'border-box' as const,
   },
 
   footer: {

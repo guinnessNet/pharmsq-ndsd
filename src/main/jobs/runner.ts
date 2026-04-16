@@ -5,7 +5,7 @@
  * 이 단일 함수로 수렴한다. source/callback 분기는 전용 모듈에 위임.
  */
 
-import type { BrowserWindow } from 'electron';
+import { type BrowserWindow, ipcMain } from 'electron';
 import { buildSheet } from '../excel/buildSheet';
 import { loadDriver } from '../automation';
 import { promptCertSelection } from '../certModal/showCertDialog';
@@ -16,6 +16,7 @@ import {
   UPLOAD_PROGRESS,
   UPLOAD_COMPLETE,
   UPLOAD_ERROR,
+  UPLOAD_CANCEL,
   HISTORY_UPDATED,
   type UploadProgressPayload,
   type UploadCompletePayload,
@@ -87,10 +88,15 @@ export async function runJob(params: {
   jobSpec: JobSpec;
   win: BrowserWindow | null;
   moduleVersion: string;
+  delayReason?: string;
 }): Promise<JobResult> {
-  const { jobSpec, win, moduleVersion } = params;
+  const { jobSpec, win, moduleVersion, delayReason } = params;
   const startedAt = new Date().toISOString();
   setTrayState('uploading');
+
+  const abortController = new AbortController();
+  const onCancel = () => abortController.abort();
+  ipcMain.once(UPLOAD_CANCEL, onCancel);
 
   const progressMsg = (step: string, current: number, total: number) => {
     win?.webContents.send(UPLOAD_PROGRESS, {
@@ -118,12 +124,12 @@ export async function runJob(params: {
       onProgress: (step, current, total) => progressMsg(step, current + 2, total + 2),
       onCertificateRequest: (candidates) =>
         win ? promptCertSelection(win, candidates) : Promise.reject(new Error('창 없음')),
-      // REAL 드라이버 계약: host 창 show/hide 제어. 자동화 패키지는 내부 NDSD 포털 창과
-      // 이 host 창을 병행 제어해 인증서 로그인 시점에만 사용자에게 노출한다.
       loginWindow: {
         show: () => win?.show(),
         hide: () => win?.hide(),
       },
+      signal: abortController.signal,
+      delayReason,
     });
 
     progressMsg('콜백 전송 중...', 6, 7);
@@ -235,6 +241,7 @@ export async function runJob(params: {
         console.warn('[runJob] 잡 파일 삭제 실패:', e);
       }
     }
+    ipcMain.removeListener(UPLOAD_CANCEL, onCancel);
     setTrayState('idle');
     refreshTray();
     win?.webContents.send(HISTORY_UPDATED);

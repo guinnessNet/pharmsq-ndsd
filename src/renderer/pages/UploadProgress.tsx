@@ -10,6 +10,7 @@ interface Props {
   step: string;
   current: number;
   total: number;
+  onCancel?: () => void;
 }
 
 const STEP_LABELS = [
@@ -24,7 +25,7 @@ const STEP_LABELS = [
   '완료',
 ];
 
-export default function UploadProgress({ step, current, total }: Props): React.ReactElement {
+export default function UploadProgress({ step, current, total, onCancel }: Props): React.ReactElement {
   const percent = total > 0 ? Math.min(100, Math.round((current / total) * 100)) : 0;
 
   return (
@@ -106,6 +107,14 @@ export default function UploadProgress({ step, current, total }: Props): React.R
             [{formatTime(-6)}] 자동화 세션 시작 · {percent}% 완료
           </div>
         </div>
+
+        {onCancel && (
+          <div style={styles.cancelWrap}>
+            <button style={styles.cancelBtn} onClick={onCancel}>
+              업로드 취소
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );
@@ -273,4 +282,22 @@ const styles: Record<string, React.CSSProperties> = {
   logsTitle: {},
   logsVersion: { color: '#94A3B8' },
   logLine: { whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' },
+
+  cancelWrap: {
+    display: 'flex',
+    justifyContent: 'center',
+    marginTop: 20,
+  },
+  cancelBtn: {
+    fontFamily: font.body,
+    fontSize: 14,
+    fontWeight: 600,
+    color: color.error,
+    background: 'transparent',
+    border: `1.5px solid ${color.error}`,
+    borderRadius: radius.md,
+    padding: '10px 32px',
+    cursor: 'pointer',
+    transition: 'background 0.15s, color 0.15s',
+  },
 };

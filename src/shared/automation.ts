@@ -78,6 +78,10 @@ export interface AutomationUploadParams {
    * @deprecated 2026-04-15 계약 개정. {@link loginWindow} 사용.
    */
   onCertificateRequest?: CertificateRequestHandler;
+  /** 취소 시그널. abort 시 자동화 BrowserWindow 파괴로 즉시 중단. */
+  signal?: AbortSignal;
+  /** 지연통보 사유. 대체조제일로부터 2일 이상 지난 행에 자동 입력. */
+  delayReason?: string;
 }
 
 export interface AutomationDriver {

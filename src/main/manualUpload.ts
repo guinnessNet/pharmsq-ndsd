@@ -21,6 +21,20 @@ import type { NdsdBatchRow } from '../shared/payload';
 import { runJob } from './jobs/runner';
 import { JOB_SPEC_VERSION, type JobSpec } from './jobs/types';
 
+function countDelayed(rows: NdsdBatchRow[]): number {
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return rows.filter((r) => {
+    const s = r.substitutedDate;
+    const subDate = new Date(
+      parseInt(s.slice(0, 4), 10),
+      parseInt(s.slice(4, 6), 10) - 1,
+      parseInt(s.slice(6, 8), 10),
+    );
+    return today.getTime() - subDate.getTime() >= 2 * 86_400_000;
+  }).length;
+}
+
 interface ManualState {
   filePath: string;
   rows: NdsdBatchRow[];
@@ -51,7 +65,7 @@ export function registerManualUploadIpc(
     try {
       const rows = await parseSheet(filePath);
       pending = { filePath, rows };
-      return { ok: true, filePath, rowCount: rows.length };
+      return { ok: true, filePath, rowCount: rows.length, delayedRowCount: countDelayed(rows) };
     } catch (err) {
       pending = null;
       return {
@@ -76,7 +90,7 @@ export function registerManualUploadIpc(
       try {
         const rows = await parseSheet(filePath);
         pending = { filePath, rows };
-        return { ok: true, filePath, rowCount: rows.length };
+        return { ok: true, filePath, rowCount: rows.length, delayedRowCount: countDelayed(rows) };
       } catch (err) {
         pending = null;
         return {
@@ -87,7 +101,7 @@ export function registerManualUploadIpc(
     },
   );
 
-  ipcMain.on(MANUAL_START, async () => {
+  ipcMain.on(MANUAL_START, async (_event, payload?: { delayReason?: string }) => {
     const win = getMainWindow();
     if (!pending) {
       win?.webContents.send(UPLOAD_ERROR, {
@@ -131,7 +145,7 @@ export function registerManualUploadIpc(
     };
 
     try {
-      await runJob({ jobSpec, win, moduleVersion });
+      await runJob({ jobSpec, win, moduleVersion, delayReason: payload?.delayReason });
     } finally {
       pending = null;
     }
