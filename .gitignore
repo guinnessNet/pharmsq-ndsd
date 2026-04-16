@@ -1,0 +1,12 @@
+node_modules/
+.webpack/
+out/
+dist/
+*.log
+.DS_Store
+tests/artifacts/
+
+# 내부 문서 안전망 — 공개 레포에 실수로 비공개 문서가 올라가지 않도록 차단.
+# 내부 설계·운영 문서는 @pharmsq/ndsd-automation 레포의 docs/internal/ 에 보관.
+docs/internal/
+**/.local-feed/
