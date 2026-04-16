@@ -24,7 +24,8 @@ if [ "$PKG_VERSION" != "$VERSION" ]; then
 fi
 
 SQUIRREL_DIR="out/make/squirrel.windows/x64"
-SETUP_EXE="${SQUIRREL_DIR}/pharmsq-ndsd-${VERSION} Setup.exe"
+# forge.config.ts 의 setupExe 가 'pharmsq-ndsd-Setup.exe' 로 버전 미포함.
+SETUP_EXE="${SQUIRREL_DIR}/pharmsq-ndsd-Setup.exe"
 NUPKG_FULL="${SQUIRREL_DIR}/pharmsq_ndsd-${VERSION}-full.nupkg"
 RELEASES_FILE="${SQUIRREL_DIR}/RELEASES"
 
@@ -47,7 +48,7 @@ gh release create "$TAG" \
   --title "pharmsq-ndsd v${VERSION}" \
   --notes "## 다운로드
 
-- **pharmsq-ndsd-${VERSION} Setup.exe** — Windows 설치 파일 (권장)
+- **pharmsq-ndsd-Setup.exe** — Windows 설치 파일 (권장, v${VERSION})
 - **pharmsq_ndsd-${VERSION}-full.nupkg**, **RELEASES** — 자동 업데이트 피드용
 
 ## 설치

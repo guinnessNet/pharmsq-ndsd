@@ -112,7 +112,7 @@ export default function ManualUpload(): React.ReactElement {
     <AppShell
       active="manual"
       title="수동 파일 업로드"
-      subtitle="NDSD 13컬럼 xlsx 파일을 직접 선택하여 업로드합니다."
+      subtitle="NDSD 13컬럼 엑셀 파일(xlsx/xlsm/xls/csv)을 직접 선택하여 업로드합니다."
       right={<span style={{ ...chip.base, ...chip.success }}>● 시스템 준비 완료</span>}
     >
       <div style={styles.grid}>
@@ -143,11 +143,13 @@ export default function ManualUpload(): React.ReactElement {
                   파일 직접 선택
                 </button>
               </div>
-              <div style={styles.dropSpec}>MAXIMUM FILE SIZE: 5MB · xlsx only</div>
+              <div style={styles.dropSpec}>MAXIMUM FILE SIZE: 5MB · xlsx / xlsm / xls / csv</div>
 
               {stage === 'picked' && fileName && (
                 <div style={styles.pickedCard}>
-                  <span style={styles.pickedBadge}>XLSX</span>
+                  <span style={styles.pickedBadge}>
+                    {(fileName.split('.').pop() || 'FILE').toUpperCase()}
+                  </span>
                   <div style={{ flex: 1, minWidth: 0 }}>
                     <div style={styles.pickedName}>{fileName}</div>
                     <div style={styles.pickedMeta}>검증 완료 · {rowCount}행 · Ready</div>

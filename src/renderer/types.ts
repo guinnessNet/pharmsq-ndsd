@@ -54,6 +54,7 @@ declare global {
         payload: CertSavePayload,
       ) => Promise<{ ok: boolean; error?: string }>;
       clearCertCredential: () => Promise<{ ok: boolean }>;
+      testCertLogin: () => Promise<{ ok: boolean; error?: string }>;
       listHistory: () => Promise<UploadHistoryEntry[]>;
       acknowledgeHistory: () => Promise<void>;
       onHistoryUpdated: (cb: () => void) => () => void;

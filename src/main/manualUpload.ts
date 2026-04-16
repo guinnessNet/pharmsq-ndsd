@@ -16,7 +16,7 @@ import {
   type ManualPickResult,
   type UploadErrorPayload,
 } from './ipc';
-import { parseSheet } from './excel/parseSheet';
+import { parseSheet, SUPPORTED_EXTENSIONS, getSupportedExt } from './excel/parseSheet';
 import type { NdsdBatchRow } from '../shared/payload';
 import { runJob } from './jobs/runner';
 import { JOB_SPEC_VERSION, type JobSpec } from './jobs/types';
@@ -38,7 +38,10 @@ export function registerManualUploadIpc(
       {
         title: 'NDSD 13컬럼 엑셀 파일 선택',
         properties: ['openFile'],
-        filters: [{ name: 'Excel', extensions: ['xlsx'] }],
+        filters: [
+          { name: 'Excel / CSV', extensions: [...SUPPORTED_EXTENSIONS] },
+          { name: '모든 파일', extensions: ['*'] },
+        ],
       },
     );
     if (result.canceled || result.filePaths.length === 0) {
@@ -64,8 +67,11 @@ export function registerManualUploadIpc(
       if (!filePath || typeof filePath !== 'string') {
         return { ok: false, error: '파일 경로를 확인할 수 없습니다.' };
       }
-      if (!filePath.toLowerCase().endsWith('.xlsx')) {
-        return { ok: false, error: 'xlsx 파일만 지원됩니다.' };
+      if (!getSupportedExt(filePath)) {
+        return {
+          ok: false,
+          error: `지원하지 않는 파일 형식입니다. 지원: ${SUPPORTED_EXTENSIONS.join(', ')}`,
+        };
       }
       try {
         const rows = await parseSheet(filePath);

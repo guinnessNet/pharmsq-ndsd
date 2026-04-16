@@ -125,6 +125,8 @@ export const CERT_STATUS = 'cert:status';
 export const CERT_SAVE = 'cert:save';
 /** renderer → main: 저장된 인증서 삭제 (invoke) */
 export const CERT_CLEAR = 'cert:clear';
+/** renderer → main: 저장된 인증서로 로그인 테스트 (invoke). 업로드는 안 함. */
+export const CERT_TEST = 'cert:test';
 
 /** renderer → main: 이력 목록 조회 (invoke) */
 export const HISTORY_LIST = 'history:list';

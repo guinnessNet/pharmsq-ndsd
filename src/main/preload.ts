@@ -22,6 +22,7 @@ import {
   CERT_STATUS,
   CERT_SAVE,
   CERT_CLEAR,
+  CERT_TEST,
   HISTORY_LIST,
   HISTORY_ACK,
   HISTORY_UPDATED,
@@ -95,6 +96,7 @@ const api = {
   saveCertCredential: (payload: CertSavePayload): Promise<{ ok: boolean; error?: string }> =>
     ipcRenderer.invoke(CERT_SAVE, payload),
   clearCertCredential: (): Promise<{ ok: boolean }> => ipcRenderer.invoke(CERT_CLEAR),
+  testCertLogin: (): Promise<{ ok: boolean; error?: string }> => ipcRenderer.invoke(CERT_TEST),
 
   // 이력
   listHistory: () => ipcRenderer.invoke(HISTORY_LIST),

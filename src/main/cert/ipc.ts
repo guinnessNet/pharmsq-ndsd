@@ -13,6 +13,7 @@ import {
   CERT_STATUS,
   CERT_SAVE,
   CERT_CLEAR,
+  CERT_TEST,
   type CertListEntry,
   type CertStatus,
   type CertSavePayload,
@@ -94,5 +95,24 @@ export function registerCertIpc(): void {
     if (!api) return { ok: false };
     api.clearCredential();
     return { ok: true };
+  });
+
+  ipcMain.handle(CERT_TEST, async (): Promise<{ ok: boolean; error?: string }> => {
+    const api = getCertApi();
+    if (!api || !api.testCertLogin) {
+      return { ok: false, error: '자동화 모듈이 설치되어 있지 않습니다.' };
+    }
+    const cred = api.loadCredential();
+    if (!cred?.encryptedPassword) {
+      return { ok: false, error: '저장된 인증서 정보가 없습니다. 먼저 암호를 저장하세요.' };
+    }
+    try {
+      return await api.testCertLogin();
+    } catch (err) {
+      return {
+        ok: false,
+        error: err instanceof Error ? err.message : String(err),
+      };
+    }
   });
 }

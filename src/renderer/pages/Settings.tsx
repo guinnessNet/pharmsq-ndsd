@@ -21,6 +21,7 @@ export default function Settings(): React.ReactElement {
   const [selected, setSelected] = useState<string>('');
   const [password, setPassword] = useState('');
   const [busy, setBusy] = useState(false);
+  const [testState, setTestState] = useState<'idle' | 'testing' | 'done'>('idle');
   const [message, setMessage] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [checking, setChecking] = useState(false);
@@ -88,6 +89,28 @@ export default function Settings(): React.ReactElement {
     await window.ndsdUploader.clearCertCredential();
     await reload();
     setMessage({ kind: 'ok', text: '삭제되었습니다.' });
+  };
+
+  const testCert = async () => {
+    setMessage(null);
+    setTestState('testing');
+    try {
+      const r = await window.ndsdUploader.testCertLogin();
+      if (r.ok) {
+        setMessage({ kind: 'ok', text: '로그인 테스트 성공 — 저장된 암호로 정상 로그인되었습니다.' });
+      } else {
+        setMessage({ kind: 'err', text: `로그인 테스트 실패: ${r.error ?? '알 수 없는 오류'}` });
+      }
+      setTestState('done');
+      // 2초 후 idle 로 복귀 → 다시 누를 수 있게
+      setTimeout(() => setTestState('idle'), 2000);
+    } catch (err) {
+      setMessage({
+        kind: 'err',
+        text: `로그인 테스트 실패: ${err instanceof Error ? err.message : String(err)}`,
+      });
+      setTestState('idle');
+    }
   };
 
   if (!settings || !certStatus) {
@@ -171,12 +194,30 @@ export default function Settings(): React.ReactElement {
             <button
               style={{ ...button.primary, flex: 1 }}
               onClick={saveCert}
-              disabled={busy || certs.length === 0}
+              disabled={busy || testState !== 'idle' || certs.length === 0}
             >
               {busy ? '저장 중...' : '저장'}
             </button>
             {certStatus.hasPassword && (
-              <button style={button.danger} onClick={clearCert} disabled={busy}>
+              <button
+                style={button.secondary}
+                onClick={testCert}
+                disabled={busy || testState !== 'idle'}
+                title="저장된 암호로 HIRA 포털 자동 로그인을 시도합니다."
+              >
+                {testState === 'testing'
+                  ? '테스트 중...'
+                  : testState === 'done'
+                    ? '테스트 완료'
+                    : '로그인 테스트'}
+              </button>
+            )}
+            {certStatus.hasPassword && (
+              <button
+                style={button.danger}
+                onClick={clearCert}
+                disabled={busy || testState !== 'idle'}
+              >
                 삭제
               </button>
             )}

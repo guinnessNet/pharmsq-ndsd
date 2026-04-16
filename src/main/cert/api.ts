@@ -32,6 +32,11 @@ export interface CertCredentialLike {
   updatedAt: string;
 }
 
+export interface CertTestResultLike {
+  ok: boolean;
+  error?: string;
+}
+
 export interface CertApi {
   scanNpki(): CertEntryLike[];
   loadCredential(): CertCredentialLike | null;
@@ -44,6 +49,8 @@ export interface CertApi {
   }): void;
   clearCredential(): void;
   isEncryptionAvailable(): boolean;
+  /** 저장된 인증서 자격증명으로 HIRA 포털 자동 로그인 시도. 업로드는 안 함. */
+  testCertLogin?(): Promise<CertTestResultLike>;
 }
 
 let cached: CertApi | null | undefined;
@@ -76,6 +83,7 @@ export function getCertApi(): CertApi | null {
       saveCredential: ns.saveCredential,
       clearCredential: ns.clearCredential,
       isEncryptionAvailable: ns.isEncryptionAvailable,
+      testCertLogin: typeof ns.testCertLogin === 'function' ? ns.testCertLogin : undefined,
     };
     return cached;
   } catch {
