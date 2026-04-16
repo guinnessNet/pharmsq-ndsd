@@ -11,10 +11,10 @@ const config: ForgeConfig = {
   packagerConfig: {
     asar: true,
     // plugin-webpack 은 자체 staging 에서 dependencies 를 설치하는데
-    // file:../ndsd-automation 로컬 경로는 해석 불가 → extraResource 로 asar 외부 복사.
+    // file:../pharmsq-ndsd-automation 로컬 경로는 해석 불가 → extraResource 로 asar 외부 복사.
     // 런타임에서는 process.resourcesPath 기준으로 require.
     extraResource: [
-      '../ndsd-automation',
+      '../pharmsq-ndsd-automation',
       './assets',
     ],
     icon: './assets/app-icon',

@@ -3,7 +3,7 @@
  *
  * 경로 우선순위:
  *   1) 일반 node_modules (dev 실행)
- *   2) process.resourcesPath/ndsd-automation (packaged 빌드 — extraResource 로 복사됨)
+ *   2) process.resourcesPath/pharmsq-ndsd-automation (packaged 빌드 — extraResource 로 복사됨)
  *
  * webpack 정적 분석 회피를 위해 동적 string + eval("require") 사용.
  */
@@ -26,7 +26,7 @@ export function resolveAutomationModule(): any {
   // 2) packaged 빌드 resourcesPath
   const resourcesPath: string | undefined = process.resourcesPath;
   if (resourcesPath) {
-    const pkgDir = path.join(resourcesPath, 'ndsd-automation');
+    const pkgDir = path.join(resourcesPath, 'pharmsq-ndsd-automation');
     const entry = path.join(pkgDir, 'dist', 'index.js');
     if (fs.existsSync(entry)) {
       try {
