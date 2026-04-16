@@ -1,7 +1,7 @@
 /**
  * 자동 업데이트 관련 공유 타입.
  *
- * `[비공개 패키지 내부 문서]` §3.3 manifest.json 스펙에 대응.
+ * 비공개 패키지의 manifest.json 스펙에 대응.
  */
 
 export type NoticeLevel = 'info' | 'warning' | 'critical';

@@ -1,7 +1,7 @@
 # ARCHITECTURE.md — pharmsq-ndsd
 
 > 현재 상태: v0.2 (driver loader 도입, 2026-04-14) — 실제 NDSD 자동화는 비공개 패키지로 분리 예정
-> 관련 설계: (비공개) @pharmsq/ndsd-automation docs/internal/REDESIGN.md
+> 관련 설계: 비공개 패키지 내부 문서 참조
 
 ## 개요
 
@@ -50,20 +50,8 @@ Electron Main Process (src/main/index.ts)
 
 ## 자동화 플로우 (REAL — 비공개 패키지 책임)
 
-```
-1. BrowserWindow 생성 (show: false, paintWhenInitiallyHidden: true)
-2. [REDACTED-URL] 로드
-3. 공인인증서(NPKI) 로그인
-   └ select-client-certificate 이벤트 → 공개 모듈 onCertificateRequest 콜백
-      → 네이티브 인증서 선택 모달 (여기만 사용자에게 표시)
-4. [비공개 — 포털 자동화 단계]
-5. 파일 업로드 → 제출
-6. 결과 파싱 (접수번호, 행별 오류)
-7. capturePage() 스크린샷 (감사용 base64)
-8. 창 파기 + callback POST
-```
-
-NDSD 셀렉터·로그인 플로우는 **비공개 패키지 내부에 은닉**. 공개 모듈은 `AutomationDriver` 인터페이스(`src/shared/automation.ts`)로만 통신.
+REAL 모드의 구체적인 자동화 단계·URL·셀렉터는 비공개 패키지(`@pharmsq/ndsd-automation`) 내부에 은닉되어 있다.
+공개 모듈은 `AutomationDriver` 인터페이스(`src/shared/automation.ts`)로만 통신하며, 포털 구조를 알지 못한다.
 
 ## 보안
 
