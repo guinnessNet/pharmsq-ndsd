@@ -164,6 +164,20 @@ gh release view pharmsq-ndsd-v<ver>
 
 ---
 
+## 보안 체크 (커밋/릴리즈 전 필수)
+
+**이 레포는 public이다.** 배포 과정에서 아래 항목이 실수로 커밋되지 않도록 반드시 확인:
+
+1. **`git diff --cached` 검토** — HIRA 포털 URL(`ndsd.hira.or.kr`, `ptl.hira.or.kr`), DOM 셀렉터, 포털 메뉴 구조가 없어야 함
+2. **`out/` 빌드 산출물 미포함** — `out/` 안에 비공개 패키지 전체(소스+.git+docs)가 들어있으므로 절대 스테이징 금지
+3. **디버그 스크립트** — 백엔드 API 경로가 담긴 스크립트는 `.gitignore` 처리. 로컬에만 보관
+4. **비공개 문서 참조** — `(비공개) @pharmsq/ndsd-automation docs/internal/REDESIGN.md §2.3` 같은 경로+섹션 노출 금지. `비공개 패키지 내부 문서 참조`로만 표기
+5. **릴리즈 자산** — Setup.exe, nupkg, RELEASES만 업로드. 소스 아카이브에 민감 파일 포함 여부 확인
+
+> 상세: `CLAUDE.md`의 "공개 레포 보안 규칙" 참조
+
+---
+
 ## 자주 발생하는 실패
 
 | 증상 | 원인 | 대처 |
