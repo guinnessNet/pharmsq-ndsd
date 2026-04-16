@@ -1,8 +1,37 @@
-# pharmsq-ndsd
+<p align="center">
+  <img src="assets/banner.png" alt="pharmsq-ndsd 배너" width="100%">
+</p>
 
-PharmSquare 및 기타 약국 관리 시스템이 대체조제 엑셀을 NDSD(심평원 대체조제 정보시스템)에 자동 업로드할 수 있도록 하는 오픈소스 Electron 모듈.
+<h1 align="center">pharmsq-ndsd</h1>
+
+<p align="center">
+  약국 관리 프로그램(팜스퀘어 · 온팜 · 유팜 · IT3000 등)이 대체조제 엑셀을<br>
+  NDSD(심평원 대체조제 정보시스템)에 자동 업로드하는 <b>오픈소스 Electron 모듈</b>
+</p>
+
+<p align="center">
+  <a href="https://github.com/guinnessNet/pharmsq-ndsd/releases/latest">
+    <img src="https://img.shields.io/github/v/release/guinnessNet/pharmsq-ndsd?label=Download%20Setup.exe&color=10B981&style=for-the-badge" alt="Download Setup.exe">
+  </a>
+  <a href="LICENSE">
+    <img src="https://img.shields.io/badge/license-Apache--2.0-blue?style=for-the-badge" alt="License">
+  </a>
+  <a href="docs/PROTOCOL.md">
+    <img src="https://img.shields.io/badge/protocol-vendor--neutral-2DD4BF?style=for-the-badge" alt="Protocol">
+  </a>
+</p>
+
+---
 
 > **현재 상태**: 1차 스캐폴드 — NDSD 자동화는 stub 구현. 실제 포털 자동화는 개발 예정.
+
+## 다운로드 · 설치
+
+1. [최신 Release](https://github.com/guinnessNet/pharmsq-ndsd/releases/latest) 에서 `pharmsq-ndsd-Setup.exe` 다운로드
+2. 실행 → SmartScreen 경고가 뜨면 **추가 정보** → **실행**
+3. 설치 후 트레이에 아이콘이 상주하며, 약국 관리 프로그램에서 NDSD 전송 버튼을 누르면 자동 실행
+
+상세: [`docs/INSTALL.md`](docs/INSTALL.md)
 
 ## 개요
 
