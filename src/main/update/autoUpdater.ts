@@ -22,11 +22,18 @@ import type { UpdateState, UpdateStatus } from '../../shared/update';
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const INITIAL_DELAY_MS = 5 * 1000; // 5 sec after boot
+/**
+ * 'checking' 상태가 이 시간보다 오래 지속되면 stuck 으로 간주하고 idle 로 리셋.
+ * Squirrel Update.exe 가 hang 하거나 이벤트를 발행하지 않고 죽었을 때의
+ * 복구 경로. 3분이면 정상 케이스(수초) 대비 충분히 여유 있음.
+ */
+const STUCK_CHECK_TIMEOUT_MS = 3 * 60 * 1000;
 
 let moduleVersion = '0.0.0';
 let state: UpdateState = 'idle';
 let stateError: string | null = null;
 let lastCheckedAt: string | null = null;
+let checkStartedAt: number | null = null;
 let timer: NodeJS.Timeout | null = null;
 let listeners: Array<(s: UpdateStatus) => void> = [];
 
@@ -61,6 +68,10 @@ export function onStatusChange(cb: (s: UpdateStatus) => void): () => void {
 }
 
 function setStatus(next: UpdateState, err: string | null = null): void {
+  // 'checking' 에서 벗어나는 순간 타이밍 트래커 초기화 — 이후 수동 재시도가 가드에 막히지 않게
+  if (next !== 'checking') {
+    checkStartedAt = null;
+  }
   state = next;
   stateError = err;
   const snapshot = getStatus();
@@ -83,8 +94,26 @@ export function checkForUpdates(): void {
     console.log('[update] dev 또는 비 Windows 환경 — autoUpdater skip');
     return;
   }
+
+  // 동시 실행 가드 — 이미 checking 중이면 Squirrel 이 spawn 한 Update.exe 가
+  // 아직 살아있다는 뜻. 한 번 더 호출하면 Update.exe mutex 충돌로
+  // "AutoUpdater process with arguments ... is already running" 에러가 난다.
+  // 정상 체크는 수 초 내 완료되므로 3분 지나면 stuck 으로 간주하고 리셋 후 재시도.
+  if (state === 'checking') {
+    const elapsed = checkStartedAt ? Date.now() - checkStartedAt : 0;
+    if (elapsed < STUCK_CHECK_TIMEOUT_MS) {
+      console.log(`[update] 이미 체크 중 (${Math.floor(elapsed / 1000)}s 경과) — 재호출 skip`);
+      return;
+    }
+    console.warn(
+      `[update] 체크가 ${Math.floor(elapsed / 1000)}s 동안 stuck. 상태 리셋 후 재시도.`,
+    );
+    setStatus('idle');
+  }
+
   try {
     lastCheckedAt = new Date().toISOString();
+    checkStartedAt = Date.now();
     setStatus('checking');
     autoUpdater.checkForUpdates();
   } catch (err) {
@@ -134,6 +163,15 @@ export function startAutoUpdater(version: string): void {
   autoUpdater.on('error', (err) => {
     const msg = err instanceof Error ? err.message : String(err);
     console.error('[update] 오류:', msg);
+
+    // "already running" 은 동시 실행 경쟁. 정식 에러 상태로 persist 하면 UI 가
+    // 영구적으로 빨간 에러를 보여주고 사용자가 새 체크 버튼을 눌러도 가드에
+    // 막힘. idle 로 리셋해서 다음 체크 시도가 정상 동작하도록.
+    if (/already running/i.test(msg)) {
+      console.log('[update] 이전 Update.exe 와 경쟁 감지 — idle 로 리셋');
+      setStatus('idle');
+      return;
+    }
     setStatus('error', msg);
   });
 

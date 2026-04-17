@@ -1,10 +1,10 @@
 {
-  "latest": "0.1.13",
-  "minVersion": "0.1.13",
+  "latest": "0.1.14",
+  "minVersion": "0.1.14",
   "releaseNotesUrl": "https://github.com/guinnessNet/pharmsq-ndsd/releases",
   "notice": {
     "level": "warning",
-    "message": "엑셀 업로드 시 '양식을 확인하세요' 거부 문제가 수정되었습니다. 업데이트 후 재시도해 주세요."
+    "message": "엑셀 업로드 거부 문제와 자동 업데이트 stuck 문제가 수정되었습니다. 업데이트 버튼이 작동하지 않으면 GitHub 릴리즈에서 Setup.exe 를 직접 받아 설치하세요."
   },
-  "publishedAt": "2026-04-17T03:55:00Z"
+  "publishedAt": "2026-04-17T04:10:00Z"
 }
