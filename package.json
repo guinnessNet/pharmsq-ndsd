@@ -1,0 +1,56 @@
+{
+  "name": "pharmsq-ndsd",
+  "productName": "pharmsq-ndsd",
+  "version": "0.1.20",
+  "description": "약국 관리 프로그램(팜스퀘어·온팜·유팜·IT3000 등)이 대체조제 엑셀을 NDSD에 자동 업로드할 수 있도록 하는 오픈소스 Electron 모듈",
+  "main": ".webpack/main",
+  "scripts": {
+    "start": "electron-forge start",
+    "start:mock": "NDSD_MOCK=1 electron-forge start",
+    "package": "electron-forge package",
+    "make": "electron-forge make",
+    "test": "vitest run"
+  },
+  "keywords": [
+    "electron",
+    "ndsd",
+    "hira",
+    "pharmacy",
+    "substitution",
+    "대체조제"
+  ],
+  "author": {
+    "name": "Maipharm"
+  },
+  "license": "Apache-2.0",
+  "devDependencies": {
+    "@electron-forge/cli": "^7.4.0",
+    "@electron-forge/maker-squirrel": "^7.4.0",
+    "@electron-forge/maker-zip": "^7.4.0",
+    "@electron-forge/plugin-auto-unpack-natives": "^7.4.0",
+    "@electron-forge/plugin-fuses": "^7.4.0",
+    "@electron-forge/plugin-webpack": "^7.4.0",
+    "@electron/fuses": "^1.8.0",
+    "@types/react": "^18.3.3",
+    "@types/react-dom": "^18.3.0",
+    "@vercel/webpack-asset-relocator-loader": "1.7.3",
+    "css-loader": "^6.0.0",
+    "electron": "^31.7.7",
+    "fork-ts-checker-webpack-plugin": "^7.2.13",
+    "node-loader": "^2.0.0",
+    "style-loader": "^3.0.0",
+    "ts-loader": "^9.2.2",
+    "ts-node": "^10.9.2",
+    "typescript": "~5.3.3",
+    "vitest": "^2.1.0"
+  },
+  "dependencies": {
+    "@pharmsq/ndsd-automation": "file:../pharmsq-ndsd-automation",
+    "axios": "^1.7.2",
+    "electron-squirrel-startup": "^1.0.1",
+    "exceljs": "^4.4.0",
+    "react": "^18.3.1",
+    "react-dom": "^18.3.1",
+    "xlsx": "^0.18.5"
+  }
+}

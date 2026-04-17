@@ -1,0 +1,10 @@
+{
+  "latest": "0.1.20",
+  "minVersion": "0.1.19",
+  "releaseNotesUrl": "https://github.com/guinnessNet/pharmsq-ndsd/releases",
+  "notice": {
+    "level": "info",
+    "message": "프로토콜 v1.1 (pharmacyHiraCode 필수화 · CANCELLED 콜백) 지원 및 에러 메시지 한글화. 외부 벤더 연동 문서(INTEGRATION.md) 추가."
+  },
+  "publishedAt": "2026-04-17T06:05:00Z"
+}
