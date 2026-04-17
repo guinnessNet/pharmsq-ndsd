@@ -1,10 +1,10 @@
 {
-  "latest": "0.1.18",
-  "minVersion": "0.1.17",
+  "latest": "0.1.19",
+  "minVersion": "0.1.19",
   "releaseNotesUrl": "https://github.com/guinnessNet/pharmsq-ndsd/releases",
   "notice": {
-    "level": "info",
-    "message": "통보 확인 다이얼로그 미발견 문제와 업로드 진행 화면의 단계 표시 불일치를 수정했습니다."
+    "level": "warning",
+    "message": "NDSD 포털 업로드 실패(엑셀 양식을 확인하세요) 및 대기 행 자동 정리 문제를 수정했습니다. 업로드 실패가 반복되던 사용자에게 강력 권장되는 업데이트입니다."
   },
-  "publishedAt": "2026-04-17T04:55:00Z"
+  "publishedAt": "2026-04-17T05:45:00Z"
 }

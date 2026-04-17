@@ -1,15 +1,24 @@
 /**
  * NdsdBatchRow[] → xlsx 바이너리 (Buffer).
  *
- * NDSD 심평원 13컬럼 양식:
+ * NDSD 포털은 xlsx 파일을 업로드 시 스타일·sheetViews·xr:uid 등 메타데이터를
+ * 포함해 포맷을 strict 검증한다. from-scratch 로 생성한 xlsx (스타일 없음) 는
+ * "엑셀 양식을 확인하세요" 로 거부된다. (2026-04-17 실측)
+ *
+ * 해결: 공식 "양식받기" 템플릿을 베이스로 로드한 뒤 데이터 행만 교체해서 저장.
+ * 스타일·스키마·공유문자열 테이블 구조가 템플릿과 동일하게 유지되어 포털이
+ * 받아들인다.
+ *
+ * 13컬럼 양식:
  *   A 연번 | B 처방전교부번호 | C 처방요양기관기호 | D 처방일 | E 대체조제일 |
  *   F 의사면허번호 | G 처방전-보험등재구분 | H 처방전-약품명 | I 처방전-약품코드 |
  *   J 대체조제-보험등재구분 | K 대체조제-약품명 | L 대체조제-약품코드 | M 비고
- *
- * 참고: PHASE_SUBSTITUTION_DESIGN.md §3.1
  */
 
 import ExcelJS from 'exceljs';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
+import { app } from 'electron';
 import type { NdsdBatchRow } from '../../shared/payload';
 
 /** 13컬럼 헤더 (NDSD 공식 양식 순서) */
@@ -44,64 +53,84 @@ const HEADERS = [
 const NUMERIC_COLS = new Set([1, 2, 3, 4, 5, 6, 7, 9, 10, 12]);
 
 /**
+ * 공식 "양식받기" 템플릿 파일의 런타임 경로를 찾는다.
+ *
+ * - packaged: extraResource 로 복사된 `resources/assets/ndsd-template.xlsx`
+ * - dev (electron-forge start): `docs/reference/대체조제_엑셀업로드_양식.xlsx`
+ * - test (vitest): 프로젝트 루트 기준 `docs/reference/대체조제_엑셀업로드_양식.xlsx`
+ */
+function resolveTemplatePath(): string {
+  // packaged 우선
+  try {
+    if (app?.isPackaged) {
+      return path.join(process.resourcesPath, 'assets', 'ndsd-template.xlsx');
+    }
+  } catch {
+    // app 객체를 사용할 수 없는 환경 (vitest 등) — 아래 fallback
+  }
+
+  // dev / test: 프로젝트 루트에서 상대 경로
+  const candidates = [
+    // dev: __dirname 이 .webpack/main 또는 src/main/excel
+    path.resolve(__dirname, '..', '..', 'docs', 'reference', '대체조제_엑셀업로드_양식.xlsx'),
+    path.resolve(__dirname, '..', '..', '..', 'docs', 'reference', '대체조제_엑셀업로드_양식.xlsx'),
+    path.resolve(process.cwd(), 'docs', 'reference', '대체조제_엑셀업로드_양식.xlsx'),
+    // packaged fallback (app 객체 사용 불가 환경)
+    path.join(process.resourcesPath ?? '', 'assets', 'ndsd-template.xlsx'),
+  ];
+  for (const p of candidates) {
+    if (p && fs.existsSync(p)) return p;
+  }
+  throw new Error(
+    `NDSD 템플릿 파일을 찾을 수 없습니다. 시도한 경로:\n${candidates.join('\n')}`,
+  );
+}
+
+/**
  * NdsdBatchRow 배열을 NDSD 공식 양식에 맞는 xlsx Buffer로 변환한다.
+ *
+ * 전략: 공식 "양식받기" 템플릿을 로드 → 샘플 데이터 행을 모두 제거 →
+ * 새 데이터 행을 추가 → writeBuffer. 스타일·sheetViews·xr:uid·공유문자열
+ * 테이블 구조가 그대로 유지되어 NDSD 포털의 파일 포맷 검증을 통과한다.
  *
  * @param rows - 서버에서 전달받은 Cartesian 전개된 행 목록
  * @returns xlsx 바이너리 Buffer
  */
 export async function buildSheet(rows: NdsdBatchRow[]): Promise<Buffer> {
+  const templatePath = resolveTemplatePath();
   const workbook = new ExcelJS.Workbook();
-  workbook.created = new Date();
+  await workbook.xlsx.readFile(templatePath);
 
-  // 시트명은 NDSD 공식 양식(docs/reference/대체조제_엑셀업로드_양식.xlsx)과 동일하게 'Sheet1' 유지.
-  const sheet = workbook.addWorksheet('Sheet1');
+  const sheet = workbook.getWorksheet('Sheet1') ?? workbook.worksheets[0];
+  if (!sheet) throw new Error('템플릿에서 시트를 찾을 수 없습니다.');
 
-  // ── 1행: 헤더 ─────────────────────────────────────────────────────────────
-  sheet.addRow(HEADERS as unknown as string[]);
+  // 템플릿의 샘플 데이터 행을 모두 제거 (1행 헤더 유지)
+  while (sheet.actualRowCount > 1) {
+    sheet.spliceRows(sheet.actualRowCount, 1);
+  }
 
-  // 헤더 스타일 (굵게, 배경색)
-  const headerRow = sheet.getRow(1);
-  headerRow.font = { bold: true };
-  headerRow.fill = {
-    type: 'pattern',
-    pattern: 'solid',
-    fgColor: { argb: 'FFDCE6F1' },
-  };
-  headerRow.commit();
-
-  // 컬럼 너비 설정
-  sheet.columns = HEADERS.map((header, idx) => ({
-    header,
-    key: String(idx + 1),
-    width: header.length < 8 ? 12 : header.length * 2 + 4,
-  }));
-
-  // ── 2행~: 데이터 ──────────────────────────────────────────────────────────
+  // 새 데이터 행 추가
   for (const row of rows) {
     const values: (string | number)[] = [
-      row.rowIndex,           // A 연번 (숫자)
-      row.issueNumber,        // B 처방전교부번호
-      row.hospitalCode,       // C 처방요양기관기호
-      row.prescribedDate,     // D 처방일
-      row.substitutedDate,    // E 대체조제일
-      row.doctorLicenseNo,    // F 의사면허번호
-      row.originalInsuranceFlag,   // G 처방전-보험등재구분 (숫자)
-      row.originalDrugName,   // H 처방전-약품명
-      row.originalDrugCode,   // I 처방전-약품코드
-      row.substituteInsuranceFlag, // J 대체조제-보험등재구분 (숫자)
-      row.substituteDrugName, // K 대체조제-약품명
-      row.substituteDrugCode, // L 대체조제-약품코드
-      row.note,               // M 비고
+      row.rowIndex, // A
+      row.issueNumber, // B
+      row.hospitalCode, // C
+      row.prescribedDate, // D
+      row.substitutedDate, // E
+      row.doctorLicenseNo, // F
+      row.originalInsuranceFlag, // G
+      row.originalDrugName, // H
+      row.originalDrugCode, // I
+      row.substituteInsuranceFlag, // J
+      row.substituteDrugName, // K
+      row.substituteDrugCode, // L
+      row.note, // M
     ];
 
     const sheetRow = sheet.addRow(values);
 
-    // 숫자 컬럼은 숫자 타입, 나머지는 문자열.
-    //
-    // 비고(13) 가 빈 값이어도 **반드시 빈 문자열로 셀을 기록** 해야 한다.
-    // null 로 두면 exceljs 가 해당 셀의 XML (<c r="M{n}"/>) 자체를 생략하고
-    // 행에 12개 셀만 남는다. NDSD 포털 파서는 행당 13컬럼을 strict 하게
-    // 요구해서 이 경우 "엑셀 양식을 확인하세요" 로 거부한다. (2026-04-17 실측)
+    // 숫자 컬럼은 number, 나머지는 string (비고 빈 값도 빈 문자열).
+    // NDSD 포털은 행당 13컬럼 strict 검증이라 비고 셀 누락 불가 — null 금지.
     values.forEach((val, colIdx) => {
       const cell = sheetRow.getCell(colIdx + 1);
       const col = colIdx + 1;
@@ -111,11 +140,9 @@ export async function buildSheet(rows: NdsdBatchRow[]): Promise<Buffer> {
         cell.value = String(val ?? '');
       }
     });
-
     sheetRow.commit();
   }
 
-  // xlsx Buffer 반환
   const arrayBuffer = await workbook.xlsx.writeBuffer();
   return Buffer.from(arrayBuffer);
 }

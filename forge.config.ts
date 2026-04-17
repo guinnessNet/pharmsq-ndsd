@@ -39,6 +39,8 @@ const config: ForgeConfig = {
     new AutoUnpackNativesPlugin({}),
     new WebpackPlugin({
       mainConfig,
+      // 기본 9000 은 Docker/WSL 등과 충돌하는 경우가 있어 9443 사용
+      loggerPort: 9443,
       renderer: {
         config: rendererConfig,
         entryPoints: [
