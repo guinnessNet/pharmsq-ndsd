@@ -98,7 +98,11 @@ export async function runJob(params: {
   const onCancel = () => abortController.abort();
   ipcMain.once(UPLOAD_CANCEL, onCancel);
 
-  const progressMsg = (step: string, current: number, total: number) => {
+  // 9단계 진행 스케일 (UploadProgress.tsx 의 STEP_LABELS 와 일치).
+  // 1 Payload · 2 Excel · 3 Portal · 4 로그인 · 5 메뉴 · 6 업로드 · 7 결과 · 8 콜백 · 9 완료
+  const TOTAL_STEPS = 9;
+
+  const progressMsg = (step: string, current: number, total: number = TOTAL_STEPS) => {
     win?.webContents.send(UPLOAD_PROGRESS, {
       step,
       current,
@@ -106,13 +110,30 @@ export async function runJob(params: {
     } satisfies UploadProgressPayload);
   };
 
+  /**
+   * 비공개 드라이버가 emit 하는 progress step 문자열을 9단계 스케일에
+   * 맞게 매핑한다. 드라이버 내부 총합(rows.length 기반)이 UI 에 직접
+   * 노출되면 "STEP 2 / 5" 처럼 러너 측 total(9) 과 달라 혼란을 준다.
+   */
+  const mapDriverStep = (phase: string): number => {
+    if (phase.includes('로그인')) return 4;
+    if (phase.includes('업로드 페이지') || phase.includes('메뉴')) return 5;
+    if (
+      phase.includes('엑셀 업로드') ||
+      phase.includes('검증') ||
+      phase.includes('지연통보')
+    )
+      return 6;
+    if (phase.includes('통보') || phase.includes('결과')) return 7;
+    return 3; // 세션/포털 초기화 단계 (기본)
+  };
+
   try {
-    progressMsg('payload 로드 중...', 0, 7);
+    progressMsg('payload 로드 중...', 1);
     const { batch, rows, inferredCallback } = await resolveSource(jobSpec);
 
-    progressMsg('엑셀 파일 생성 중...', 1, 7);
+    progressMsg('엑셀 파일 생성 중...', 2);
     const xlsxBuffer = await buildSheet(rows);
-    progressMsg('엑셀 파일 생성 완료', 2, 7);
 
     const driver = await loadDriver();
     console.log('[runJob] driver =', driver.name, 'jobId =', jobSpec.jobId);
@@ -121,7 +142,8 @@ export async function runJob(params: {
       rows,
       batchId: batch.batchId,
       moduleVersion,
-      onProgress: (step, current, total) => progressMsg(step, current + 2, total + 2),
+      // 드라이버 내부 step/total 은 무시하고 9단계 스케일로 재매핑.
+      onProgress: (step) => progressMsg(step, mapDriverStep(step)),
       onCertificateRequest: (candidates) =>
         win ? promptCertSelection(win, candidates) : Promise.reject(new Error('창 없음')),
       loginWindow: {
@@ -132,9 +154,9 @@ export async function runJob(params: {
       delayReason,
     });
 
-    progressMsg('콜백 전송 중...', 6, 7);
+    progressMsg('콜백 전송 중...', 8);
     await dispatchCallback(jobSpec, callbackBody, inferredCallback);
-    progressMsg('완료', 7, 7);
+    progressMsg('완료', 9);
 
     const status: 'success' | 'partial' | 'failed' =
       callbackBody.status === 'SUCCESS'

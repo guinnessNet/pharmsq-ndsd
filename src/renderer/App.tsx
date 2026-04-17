@@ -176,12 +176,9 @@ export default function App(): React.ReactElement {
     if (route === 'settings') return <Settings />;
     if (route === 'history') return <History />;
     if (route === 'manual') return <ManualUpload />;
+    const { title, subtitle } = headerForPage(state);
     return (
-      <AppShell
-        active="upload"
-        title="업로드 대기"
-        subtitle="약국 관리 프로그램의 딥링크 수신을 기다리는 중입니다."
-      >
+      <AppShell active="upload" title={title} subtitle={subtitle}>
         {renderUploadPage()}
       </AppShell>
     );
@@ -203,7 +200,7 @@ export default function App(): React.ReactElement {
           <UploadProgress
             step={state.progress?.step ?? '처리 중...'}
             current={state.progress?.current ?? 0}
-            total={state.progress?.total ?? 7}
+            total={state.progress?.total ?? 9}
             onCancel={handleCancel}
           />
         );
@@ -213,6 +210,36 @@ export default function App(): React.ReactElement {
       default:
         return <WaitingDeepLink loading={false} />;
     }
+  }
+}
+
+/**
+ * AppShell 의 타이틀/서브타이틀을 현재 state.page 에 맞춰 반환.
+ * 이전에는 항상 "업로드 대기" 로 고정되어 진행·완료·오류 상태에서도
+ * "업로드 대기" 가 보이는 표시 버그가 있었음.
+ */
+function headerForPage(state: AppState): { title: string; subtitle: string } {
+  switch (state.page) {
+    case 'waiting':
+      return {
+        title: '업로드 대기',
+        subtitle: '약국 관리 프로그램의 딥링크 수신을 기다리는 중입니다.',
+      };
+    case 'loading':
+      return { title: '정보 확인 중', subtitle: '서버에서 내역을 조회하는 중입니다.' };
+    case 'confirm':
+      return { title: '업로드 확인', subtitle: '제출 전 내역을 확인해 주세요.' };
+    case 'progress':
+      return {
+        title: '업로드 진행 중',
+        subtitle: '자동화가 완료될 때까지 기다려주세요.',
+      };
+    case 'result':
+      return { title: '업로드 완료', subtitle: '업로드 결과를 확인하세요.' };
+    case 'error':
+      return { title: '오류 발생', subtitle: '업로드 중 오류가 발생했습니다.' };
+    default:
+      return { title: '업로드', subtitle: '' };
   }
 }
 

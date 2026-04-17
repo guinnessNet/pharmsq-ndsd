@@ -97,7 +97,7 @@ export default function ManualUpload(): React.ReactElement {
 
   const upload = () => {
     setStage('uploading');
-    setProgress({ step: '시작 중...', cur: 0, total: 7 });
+    setProgress({ step: '시작 중...', cur: 0, total: 9 });
     window.ndsdUploader.startManualUpload(delayReason.trim() ? { delayReason: delayReason.trim() } : undefined);
   };
 
@@ -177,7 +177,7 @@ export default function ManualUpload(): React.ReactElement {
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
                 <div style={styles.progressMeta}>
-                  {progress?.cur ?? 0} / {progress?.total ?? 7} · {pct}%
+                  {progress?.cur ?? 0} / {progress?.total ?? 9} · {pct}%
                 </div>
                 <button
                   style={styles.cancelBtn}
