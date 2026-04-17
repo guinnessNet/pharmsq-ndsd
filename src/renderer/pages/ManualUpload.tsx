@@ -6,6 +6,7 @@
 import React, { useEffect, useState } from 'react';
 import type { CallbackRequest } from '../../shared/callback';
 import AppShell from '../components/AppShell';
+import UploadFailureUpdatePrompt from '../components/UploadFailureUpdatePrompt';
 import { button, chip, color, font, radius, shadow, text } from '../theme';
 
 type Stage = 'idle' | 'picked' | 'uploading' | 'done' | 'error';
@@ -209,7 +210,8 @@ export default function ManualUpload(): React.ReactElement {
             <div style={styles.errorBox}>
               <div style={{ ...text.title, color: color.error }}>업로드 실패</div>
               <pre style={styles.errorPre}>{error}</pre>
-              <div style={{ display: 'flex', gap: 8 }}>
+              <UploadFailureUpdatePrompt />
+              <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
                 <button style={button.secondary} onClick={reset}>
                   처음부터
                 </button>

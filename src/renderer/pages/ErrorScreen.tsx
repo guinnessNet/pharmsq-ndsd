@@ -3,6 +3,7 @@
  */
 
 import React from 'react';
+import UploadFailureUpdatePrompt from '../components/UploadFailureUpdatePrompt';
 import { button, color, font, radius, shadow, text } from '../theme';
 
 interface Props {
@@ -31,6 +32,8 @@ export default function ErrorScreen({ message, onRetry, onClose }: Props): React
             <pre style={styles.pre}>{message}</pre>
           </details>
         )}
+
+        <UploadFailureUpdatePrompt />
 
         <button style={{ ...button.primary, width: '100%', marginTop: 24 }} onClick={onRetry}>
           처음으로

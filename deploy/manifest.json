@@ -1,10 +1,10 @@
 {
-  "latest": "0.1.15",
+  "latest": "0.1.16",
   "minVersion": "0.1.14",
   "releaseNotesUrl": "https://github.com/guinnessNet/pharmsq-ndsd/releases",
   "notice": {
     "level": "info",
-    "message": "자동 업데이트 동작 확인용 릴리즈입니다."
+    "message": "업로드 실패 시 업데이트 안내 배너가 추가되었습니다."
   },
-  "publishedAt": "2026-04-17T04:20:00Z"
+  "publishedAt": "2026-04-17T04:35:00Z"
 }
