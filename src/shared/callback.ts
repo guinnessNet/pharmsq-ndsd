@@ -7,7 +7,12 @@
  * 참고: ELECTRON_MODULE_CONTRACT.md §5
  */
 
-export type BatchStatus = 'SUCCESS' | 'PARTIAL' | 'FAILED';
+/**
+ * v1.1: CANCELLED 추가. 사용자가 인증서 선택·비밀번호 입력·업로드 진행 중 취소해
+ * 포털에는 아무 것도 전송되지 않은 상태. 서버는 이 콜백을 받으면 배치 상태를
+ * 재시도 가능 상태로 원복(PENDING) 해야 함. PROTOCOL.md §3.2.
+ */
+export type BatchStatus = 'SUCCESS' | 'PARTIAL' | 'FAILED' | 'CANCELLED';
 export type RowStatus = 'SUCCESS' | 'FAILED';
 
 /** 행별 처리 결과 */

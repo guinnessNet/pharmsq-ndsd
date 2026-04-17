@@ -10,7 +10,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { randomUUID } from 'crypto';
 
-export type UploadStatus = 'success' | 'partial' | 'failed';
+export type UploadStatus = 'success' | 'partial' | 'failed' | 'cancelled';
 export type UploadSource = 'deeplink' | 'manual';
 
 export interface UploadHistoryEntry {

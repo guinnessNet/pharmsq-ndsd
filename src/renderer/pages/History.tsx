@@ -8,7 +8,7 @@ import type { UploadHistoryEntry } from '../../main/history/store';
 import AppShell from '../components/AppShell';
 import { button, chip, color, font, radius, shadow, text } from '../theme';
 
-type StatusFilter = 'all' | 'success' | 'partial' | 'failed';
+type StatusFilter = 'all' | 'success' | 'partial' | 'failed' | 'cancelled';
 
 export default function History(): React.ReactElement {
   const [entries, setEntries] = useState<UploadHistoryEntry[]>([]);
@@ -36,7 +36,7 @@ export default function History(): React.ReactElement {
   );
 
   const counts = useMemo(() => {
-    const c = { all: entries.length, success: 0, partial: 0, failed: 0 };
+    const c = { all: entries.length, success: 0, partial: 0, failed: 0, cancelled: 0 };
     entries.forEach((e) => {
       c[e.status] = (c[e.status] ?? 0) + 1;
     });
@@ -52,6 +52,7 @@ export default function History(): React.ReactElement {
             <Tab active={filter === 'success'} onClick={() => setFilter('success')} label="성공" count={counts.success} />
             <Tab active={filter === 'partial'} onClick={() => setFilter('partial')} label="부분실패" count={counts.partial} />
             <Tab active={filter === 'failed'} onClick={() => setFilter('failed')} label="실패" count={counts.failed} />
+            <Tab active={filter === 'cancelled'} onClick={() => setFilter('cancelled')} label="취소됨" count={counts.cancelled} />
           </div>
           <button
             style={button.secondary}

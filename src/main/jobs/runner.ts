@@ -95,7 +95,11 @@ export async function runJob(params: {
   setTrayState('uploading');
 
   const abortController = new AbortController();
-  const onCancel = () => abortController.abort();
+  let userCancelled = false;
+  const onCancel = () => {
+    userCancelled = true;
+    abortController.abort();
+  };
   ipcMain.once(UPLOAD_CANCEL, onCancel);
 
   // 9단계 진행 스케일 (UploadProgress.tsx 의 STEP_LABELS 와 일치).
@@ -226,6 +230,13 @@ export async function runJob(params: {
       console.error(`[runJob] 오류 jobId=${jobSpec.jobId} raw:`, err);
     }
 
+    // v1.1: 사용자 취소는 FAILED 가 아니라 CANCELLED 로 서버에 알려 배치 상태를
+    // 재시도 가능 상태로 원복시킨다. 포털에는 아무 것도 전송되지 않은 상태이므로
+    // 실패와 의미가 다름. PROTOCOL.md §3.2.
+    const isCancelled = userCancelled || abortController.signal.aborted;
+    const terminalStatus: 'FAILED' | 'CANCELLED' = isCancelled ? 'CANCELLED' : 'FAILED';
+    const historyStatus: 'failed' | 'cancelled' = isCancelled ? 'cancelled' : 'failed';
+
     appendEntry({
       source: jobSpec.source.type === 'http-fetch' ? 'deeplink' : 'manual',
       batchId:
@@ -234,17 +245,48 @@ export async function runJob(params: {
           : jobSpec.source.batchId,
       rowCount:
         jobSpec.source.type === 'file-drop' ? jobSpec.source.rows.length : 0,
-      status: 'failed',
+      status: historyStatus,
       errorMessage: msg,
     });
-    notifyFailure('NDSD 업로드 실패', msg);
+    notifyFailure(
+      isCancelled ? 'NDSD 업로드 취소됨' : 'NDSD 업로드 실패',
+      isCancelled ? '사용자가 업로드를 취소했습니다. 배치는 재시도 가능 상태로 복구됩니다.' : msg,
+    );
 
     win?.webContents.send(UPLOAD_ERROR, { error: msg } satisfies UploadErrorPayload);
+
+    // v1.1: CANCELLED 콜백을 서버에 전송해 배치 상태 원복 유도.
+    // HTTP 콜백이 설정돼 있을 때만 시도 (file/none 은 스킵). 실패는 무시.
+    if (isCancelled) {
+      try {
+        const batchId =
+          jobSpec.source.type === 'file-drop'
+            ? jobSpec.source.batch.batchId
+            : jobSpec.source.batchId;
+        const rowCount =
+          jobSpec.source.type === 'file-drop' ? jobSpec.source.rows.length : 0;
+        const cancelBody: CallbackRequest = {
+          batchId,
+          status: 'CANCELLED',
+          submittedAt: new Date().toISOString(),
+          totalRows: rowCount,
+          successRows: 0,
+          failedRows: 0,
+          perRow: [],
+          moduleVersion,
+        };
+        await dispatchCallback(jobSpec, cancelBody, undefined).catch((e) => {
+          console.warn('[runJob] CANCELLED 콜백 전송 실패 (무시):', e);
+        });
+      } catch (e) {
+        console.warn('[runJob] CANCELLED 콜백 준비 실패:', e);
+      }
+    }
 
     const result: JobResult = {
       specVersion: JOB_SPEC_VERSION,
       jobId: jobSpec.jobId,
-      status: 'FAILED',
+      status: terminalStatus,
       startedAt,
       completedAt: new Date().toISOString(),
       rowCount:

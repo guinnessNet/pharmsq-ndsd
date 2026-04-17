@@ -1,0 +1,13 @@
+{
+  "name": "pharmsq-ndsd-reference-server",
+  "version": "1.0.0",
+  "description": "최소 구현 stub — 벤더 연동 시험용 로컬 서버. 프로토콜 v1.1 대응.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2"
+  }
+}
