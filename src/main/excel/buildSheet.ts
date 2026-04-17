@@ -96,17 +96,19 @@ export async function buildSheet(rows: NdsdBatchRow[]): Promise<Buffer> {
 
     const sheetRow = sheet.addRow(values);
 
-    // 숫자 컬럼은 숫자 타입, 비고(13)는 빈 값이면 null, 나머지는 문자열로 보정
+    // 숫자 컬럼은 숫자 타입, 나머지는 문자열.
+    //
+    // 비고(13) 가 빈 값이어도 **반드시 빈 문자열로 셀을 기록** 해야 한다.
+    // null 로 두면 exceljs 가 해당 셀의 XML (<c r="M{n}"/>) 자체를 생략하고
+    // 행에 12개 셀만 남는다. NDSD 포털 파서는 행당 13컬럼을 strict 하게
+    // 요구해서 이 경우 "엑셀 양식을 확인하세요" 로 거부한다. (2026-04-17 실측)
     values.forEach((val, colIdx) => {
       const cell = sheetRow.getCell(colIdx + 1);
       const col = colIdx + 1;
       if (NUMERIC_COLS.has(col)) {
         cell.value = typeof val === 'number' ? val : Number(val);
-      } else if (col === 13 && (val === '' || val == null)) {
-        // 비고: 빈 값은 null (레퍼런스 양식 동작 준수)
-        cell.value = null;
       } else {
-        cell.value = String(val);
+        cell.value = String(val ?? '');
       }
     });
 

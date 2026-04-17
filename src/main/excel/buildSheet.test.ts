@@ -121,7 +121,7 @@ describe('buildSheet', () => {
     expect(typeof sheet.getRow(3).getCell(10).value).toBe('number');
   });
 
-  it('약품명(8, 11) · 비고(13) 는 문자열 또는 null 이다', async () => {
+  it('약품명(8, 11) · 비고(13) 는 모든 행에 문자열 셀로 존재한다', async () => {
     const buf = await buildSheet(SAMPLE_ROWS);
 
     const wb = new ExcelJS.Workbook();
@@ -132,8 +132,9 @@ describe('buildSheet', () => {
     expect(typeof sheet.getRow(2).getCell(8).value).toBe('string');
     expect(typeof sheet.getRow(2).getCell(11).value).toBe('string');
 
-    // SAMPLE_ROWS[0].note = '' → 빈 비고는 null 로 저장 (레퍼런스 양식 동일)
-    expect(sheet.getRow(2).getCell(13).value).toBeNull();
+    // SAMPLE_ROWS[0].note = '' → 빈 문자열 셀 (M 셀이 XML 에서 생략되지 않도록).
+    // NDSD 포털 파서가 행당 13컬럼을 strict 하게 요구해서 null 로 두면 거부됨.
+    expect(sheet.getRow(2).getCell(13).value).toBe('');
 
     // SAMPLE_ROWS[1].note = '비급여 대체' → 문자열
     expect(sheet.getRow(3).getCell(13).value).toBe('비급여 대체');
