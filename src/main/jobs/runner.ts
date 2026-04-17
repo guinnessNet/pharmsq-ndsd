@@ -194,7 +194,15 @@ export async function runJob(params: {
     return result;
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
-    console.error('[runJob] 오류 jobId=', jobSpec.jobId, msg);
+    // 사용자에게 보여줄 메시지는 위에서 가공된 한 줄 (단계 라벨 포함).
+    // 원본 스택/전체 에러는 로그 파일에만 남긴다.
+    if (err instanceof Error) {
+      console.error(
+        `[runJob] 오류 jobId=${jobSpec.jobId} raw stack:\n${err.stack ?? err.message}`,
+      );
+    } else {
+      console.error(`[runJob] 오류 jobId=${jobSpec.jobId} raw:`, err);
+    }
 
     appendEntry({
       source: jobSpec.source.type === 'http-fetch' ? 'deeplink' : 'manual',

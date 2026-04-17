@@ -198,3 +198,10 @@ export const UPDATE_CHECK = 'update:check';
 export const UPDATE_APPLY = 'update:apply';
 /** main → renderer: 업데이트 상태 변화 브로드캐스트 */
 export const UPDATE_STATUS_CHANGED = 'update:status-changed';
+
+// ─── 로그 ───────────────────────────────────────────────────────────────────
+
+/** renderer → main: 로그 폴더를 OS 파일 탐색기에서 열기 (invoke) */
+export const LOG_OPEN_FOLDER = 'log:openFolder';
+/** renderer → main: 현재 로그 파일 경로 조회 (invoke) */
+export const LOG_GET_PATH = 'log:getPath';

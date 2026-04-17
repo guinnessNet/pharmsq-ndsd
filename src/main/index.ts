@@ -9,6 +9,8 @@
  */
 
 import { app, BrowserWindow, ipcMain, Menu, Notification } from 'electron';
+import { installFileLogger, currentLogFile, openLogsFolder } from './log/logger';
+import { LOG_OPEN_FOLDER, LOG_GET_PATH } from './ipc';
 import { broadcastDeepLink, parseDeepLink } from './deeplink';
 import { fetchPayload } from './payload';
 import { isMockMode } from './automation';
@@ -236,6 +238,13 @@ let stopWatcher: (() => void) | null = null;
 app.whenReady().then(() => {
   // Electron 기본 애플리케이션 메뉴(파일/편집/보기/...)를 숨긴다 — 트레이 메뉴로 통일.
   Menu.setApplicationMenu(null);
+
+  // 파일 로거를 가장 먼저 설치 — 이후 console.* 가 파일에도 남는다
+  installFileLogger();
+
+  // 로그 IPC
+  ipcMain.handle(LOG_OPEN_FOLDER, async () => openLogsFolder());
+  ipcMain.handle(LOG_GET_PATH, () => currentLogFile());
 
   try {
     ensureDirs();

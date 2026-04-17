@@ -1,7 +1,7 @@
 {
   "name": "pharmsq-ndsd",
   "productName": "pharmsq-ndsd",
-  "version": "0.1.12",
+  "version": "0.1.13",
   "description": "약국 관리 프로그램(팜스퀘어·온팜·유팜·IT3000 등)이 대체조제 엑셀을 NDSD에 자동 업로드할 수 있도록 하는 오픈소스 Electron 모듈",
   "main": ".webpack/main",
   "scripts": {

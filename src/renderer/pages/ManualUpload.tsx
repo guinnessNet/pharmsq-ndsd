@@ -209,9 +209,18 @@ export default function ManualUpload(): React.ReactElement {
             <div style={styles.errorBox}>
               <div style={{ ...text.title, color: color.error }}>업로드 실패</div>
               <pre style={styles.errorPre}>{error}</pre>
-              <button style={button.secondary} onClick={reset}>
-                처음부터
-              </button>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button style={button.secondary} onClick={reset}>
+                  처음부터
+                </button>
+                <button
+                  style={button.ghost}
+                  onClick={() => window.ndsdUploader.openLogsFolder()}
+                  title="상세 진단 로그가 담긴 폴더를 엽니다."
+                >
+                  로그 폴더 열기
+                </button>
+              </div>
             </div>
           )}
         </div>
@@ -277,6 +286,12 @@ export default function ManualUpload(): React.ReactElement {
       {error && stage !== 'error' && (
         <div style={{ ...styles.errorBox, marginTop: 16 }}>
           <pre style={styles.errorPre}>{error}</pre>
+          <button
+            style={button.ghost}
+            onClick={() => window.ndsdUploader.openLogsFolder()}
+          >
+            로그 폴더 열기
+          </button>
         </div>
       )}
     </AppShell>

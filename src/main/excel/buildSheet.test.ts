@@ -94,14 +94,34 @@ describe('buildSheet', () => {
     const dataRow = sheet.getRow(2);
 
     const first = SAMPLE_ROWS[0];
-    expect(dataRow.getCell(1).value).toBe(first.rowIndex);          // A 연번
-    expect(dataRow.getCell(2).value).toBe(first.issueNumber);       // B 처방전교부번호
-    expect(dataRow.getCell(3).value).toBe(first.hospitalCode);      // C 처방요양기관기호
-    expect(dataRow.getCell(8).value).toBe(first.originalDrugName);  // H 처방전-약품명
-    expect(dataRow.getCell(11).value).toBe(first.substituteDrugName); // K 대체조제-약품명
+    expect(dataRow.getCell(1).value).toBe(first.rowIndex);              // A 연번
+    expect(dataRow.getCell(2).value).toBe(Number(first.issueNumber));   // B 처방전교부번호 (number)
+    expect(dataRow.getCell(3).value).toBe(Number(first.hospitalCode));  // C 처방요양기관기호 (number)
+    expect(dataRow.getCell(8).value).toBe(first.originalDrugName);      // H 처방전-약품명 (string)
+    expect(dataRow.getCell(11).value).toBe(first.substituteDrugName);   // K 대체조제-약품명 (string)
   });
 
-  it('숫자 컬럼(연번, 보험등재구분)은 number 타입이다', async () => {
+  it('NDSD 레퍼런스 양식과 동일하게 10개 컬럼이 number 타입이다', async () => {
+    const buf = await buildSheet(SAMPLE_ROWS);
+
+    const wb = new ExcelJS.Workbook();
+    await wb.xlsx.load(buf);
+
+    const sheet = wb.getWorksheet('Sheet1')!;
+    const r = sheet.getRow(2);
+
+    // 연번(1) · 처방전교부번호(2) · 처방요양기관기호(3) · 처방일(4) · 대체조제일(5)
+    // · 의사면허번호(6) · 처방전-보험등재구분(7) · 처방전-약품코드(9)
+    // · 대체조제-보험등재구분(10) · 대체조제-약품코드(12)
+    for (const col of [1, 2, 3, 4, 5, 6, 7, 9, 10, 12]) {
+      expect(typeof r.getCell(col).value).toBe('number');
+    }
+
+    // substituteInsuranceFlag=0 도 number (2번째 데이터 행)
+    expect(typeof sheet.getRow(3).getCell(10).value).toBe('number');
+  });
+
+  it('약품명(8, 11) · 비고(13) 는 문자열 또는 null 이다', async () => {
     const buf = await buildSheet(SAMPLE_ROWS);
 
     const wb = new ExcelJS.Workbook();
@@ -109,12 +129,14 @@ describe('buildSheet', () => {
 
     const sheet = wb.getWorksheet('Sheet1')!;
 
-    // rowIndex=1 (A열)
-    expect(typeof sheet.getRow(2).getCell(1).value).toBe('number');
-    // originalInsuranceFlag=1 (G열)
-    expect(typeof sheet.getRow(2).getCell(7).value).toBe('number');
-    // substituteInsuranceFlag=0 (J열, 2번째 데이터)
-    expect(typeof sheet.getRow(3).getCell(10).value).toBe('number');
+    expect(typeof sheet.getRow(2).getCell(8).value).toBe('string');
+    expect(typeof sheet.getRow(2).getCell(11).value).toBe('string');
+
+    // SAMPLE_ROWS[0].note = '' → 빈 비고는 null 로 저장 (레퍼런스 양식 동일)
+    expect(sheet.getRow(2).getCell(13).value).toBeNull();
+
+    // SAMPLE_ROWS[1].note = '비급여 대체' → 문자열
+    expect(sheet.getRow(3).getCell(13).value).toBe('비급여 대체');
   });
 
   it('빈 rows 배열을 받으면 헤더 행만 있는 파일을 반환한다', async () => {

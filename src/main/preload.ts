@@ -34,6 +34,8 @@ import {
   UPDATE_CHECK,
   UPDATE_APPLY,
   UPDATE_STATUS_CHANGED,
+  LOG_OPEN_FOLDER,
+  LOG_GET_PATH,
   type DeepLinkReceivedPayload,
   type DeepLinkErrorPayload,
   type PayloadResultPayload,
@@ -125,6 +127,10 @@ const api = {
   applyUpdate: (): Promise<void> => ipcRenderer.invoke(UPDATE_APPLY),
   onUpdateStatusChanged: (cb: (status: UpdateStatus) => void) =>
     onChannel<UpdateStatus>(UPDATE_STATUS_CHANGED, cb),
+
+  // 로그
+  openLogsFolder: (): Promise<string> => ipcRenderer.invoke(LOG_OPEN_FOLDER),
+  getLogFilePath: (): Promise<string> => ipcRenderer.invoke(LOG_GET_PATH),
 };
 
 contextBridge.exposeInMainWorld('ndsdUploader', api);
