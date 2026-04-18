@@ -53,8 +53,9 @@
 3. [ ] 엔드포인트: `GET /batch/:id/payload` — 토큰 검증 + rows + 새 콜백 토큰 반환
 4. [ ] 엔드포인트: `POST /batch/:id/callback` — 토큰 검증 + 결과 수신 + 상태 갱신
 5. [ ] UI: 약사가 "NDSD 에 통보" 버튼 누르면 `issue-token` 호출 → `window.location.href = deepLinkUrl`
-6. [ ] 약국에 업로더 Setup.exe 배포 (최초 1회) + NPKI 인증서 등록 안내
-7. [ ] E2E 테스트: 아래 §7 체크리스트 전항 통과
+6. [ ] UI: 배치 상태가 `SUBMITTING` 인 동안 **해당 배치의 전송 버튼 잠금** (§6.3 참조)
+7. [ ] 약국에 업로더 Setup.exe 배포 (최초 1회) + NPKI 인증서 등록 안내
+8. [ ] E2E 테스트: 아래 §7 체크리스트 전항 통과
 
 ## 4. 엔드포인트 구현 예시
 
@@ -312,6 +313,83 @@ System.Diagnostics.Process.Start(new ProcessStartInfo {
   UseShellExecute = true,
 });
 ```
+
+### 6.3 동시 전송 방지 — 버튼 잠금 (필수)
+
+업로더 v0.2.2+ 는 내부에 전역 직렬화 게이트가 있어 두 배치가 동시에 들어와도
+한 번에 하나씩만 처리합니다. **다만 이는 방어선의 마지막 한 겹일 뿐이며, 벤더
+PMS 에서 버튼 잠금을 구현하는 것이 필수**입니다. 이유:
+
+- **콜백이 돌아오기 전에 사용자가 같은 배치를 다시 누르면** 약국 입장에서는
+  "눌렀는데 반응이 없어서" 재클릭한 것이지만 서버는 같은 `batchId` 에 대해
+  토큰을 두 번 발급하게 되고, 첫 번째 토큰은 만료 전까지 부유 상태가 됩니다.
+- **다른 배치를 연속으로 누르면** 업로더는 직렬 처리하지만 약국 직원은
+  "처음 배치만 처리되는 것처럼" 보여 두 번째를 취소 요청할 수 있습니다.
+- **벤더 서버의 배치 상태가 `SUBMITTING` 에 머무르는 동안에는** 그 배치의
+  재전송·수정·삭제 버튼을 모두 잠그는 것이 안전합니다.
+
+#### 권장 상태 머신
+
+```
+PENDING ──[issue-token]──▶ SUBMITTING ──[callback.status=SUCCESS]──▶ COMPLETED
+                               │                                        ▲
+                               │──[callback.status=PARTIAL]─────────────┤
+                               │──[callback.status=FAILED]────────────▶ FAILED
+                               │                                        ▲
+                               │──[callback.status=CANCELLED]─────────▶ PENDING
+                               │                                        (원복, 재시도 가능)
+                               │
+                               └──[60분 경과, 콜백 없음]──────────────▶ TIMEOUT
+                                                                        (운영자 수동 확인)
+```
+
+#### UI 규칙
+
+| 배치 상태 | "NDSD 통보" 버튼 |
+|---|---|
+| `PENDING` | 활성화 |
+| `SUBMITTING` | **비활성화** + "업로더에서 처리 중..." 문구 표시 |
+| `COMPLETED` / `FAILED` / `PARTIAL` | 비활성화 (또는 "재통보" 별도 액션) |
+| `CANCELLED` → `PENDING` 원복 | 활성화 |
+| `TIMEOUT` (60분 초과) | 운영자 확인 후 수동 `PENDING` 복귀 또는 `FAILED` 처리 |
+
+#### 구현 예시 (프런트엔드)
+
+```tsx
+function NdsdSubmitButton({ batch }: { batch: Batch }) {
+  const locked = batch.status === 'SUBMITTING' || batch.status === 'COMPLETED';
+  return (
+    <button disabled={locked} onClick={() => startNdsdUpload(batch.id)}>
+      {batch.status === 'SUBMITTING' ? '업로더에서 처리 중...' : 'NDSD 통보'}
+    </button>
+  );
+}
+```
+
+#### 서버 측 이중 방어
+
+버튼이 잠기더라도(개발자 도구 조작·오래된 캐시·여러 탭 동시 열기 등) 동일
+배치가 두 번 도달할 수 있습니다. `issue-token` 엔드포인트에서도 거부하는 것이
+안전합니다:
+
+```ts
+router.post('/batch/:id/issue-token', async (req, res) => {
+  const batch = await prisma.substitutionBatch.findUnique({ where: { id: req.params.id } });
+  if (!batch) return res.status(404).end();
+  if (batch.status === 'SUBMITTING') {
+    return res.status(409).json({ error: 'ALREADY_SUBMITTING', message: '이미 업로더에서 처리 중인 배치입니다.' });
+  }
+  if (batch.status === 'COMPLETED') {
+    return res.status(409).json({ error: 'ALREADY_COMPLETED' });
+  }
+  // 토큰 발급 + 상태를 SUBMITTING 으로 전이
+  await prisma.substitutionBatch.update({ where: { id: batch.id }, data: { status: 'SUBMITTING' } });
+  // ...
+});
+```
+
+> 업로더 자체 직렬화(v0.2.2+)로도 세션 꼬임은 막히지만, 사용자 UX(중복 알림,
+> 대기 지연, "눌렀는데 왜 안 되지" 혼란)는 벤더 UI 쪽 잠금 없이 해결되지 않습니다.
 
 ## 7. E2E 테스트 체크리스트
 

@@ -220,7 +220,7 @@ async function onDeepLink(url: string): Promise<void> {
     return;
   }
   inFlightJobs.add(spec.jobId);
-  void runJob({ jobSpec: spec, win, moduleVersion: MODULE_VERSION })
+  void runJobSerialized({ jobSpec: spec, win, moduleVersion: MODULE_VERSION })
     .finally(() => inFlightJobs.delete(spec.jobId));
 }
 
@@ -230,6 +230,32 @@ async function onDeepLink(url: string): Promise<void> {
  * 여기서 in-flight 를 1차 차단한다.
  */
 const inFlightJobs = new Set<string>();
+
+/**
+ * 전역 직렬화 게이트. 드라이버(Chromium 세션·NPKI 로그인·포털 페이지)는 단일 자원이므로
+ * 서로 다른 jobId 여도 동시에 runJob 을 돌리면 세션이 꼬여 뒤 잡이 영구 행거된다
+ * (검증 완료: 두 잡 동시 spawn 시 뒤 잡이 HTTP 이후 결과 JSON 을 쓰지 못함).
+ * 같은 순간 하나의 runJob 만 실행되도록 직렬화하고, 후속 잡은 앞 잡이 끝날 때까지 대기.
+ */
+let activeJob: Promise<unknown> | null = null;
+
+async function runJobSerialized(params: Parameters<typeof runJob>[0]): Promise<void> {
+  while (activeJob) {
+    console.log('[main] 다른 잡 진행 중 — 대기:', params.jobSpec.jobId);
+    try {
+      await activeJob;
+    } catch {
+      // 앞 잡의 에러는 여기서 흡수 — 우리 잡은 계속 진행해야 함
+    }
+  }
+  const p = runJob(params);
+  activeJob = p;
+  try {
+    await p;
+  } finally {
+    if (activeJob === p) activeJob = null;
+  }
+}
 
 /** --job argv 또는 watcher 에서 발견한 잡 파일 실행. */
 async function onJobFile(jobId: string): Promise<void> {
@@ -247,7 +273,7 @@ async function onJobFile(jobId: string): Promise<void> {
       return;
     }
     const win = showWindow('upload');
-    await runJob({ jobSpec: spec, win, moduleVersion: MODULE_VERSION });
+    await runJobSerialized({ jobSpec: spec, win, moduleVersion: MODULE_VERSION });
   } finally {
     inFlightJobs.delete(jobId);
   }
