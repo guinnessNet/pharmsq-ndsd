@@ -23,7 +23,7 @@
 
 ---
 
-> **현재 상태**: 1차 스캐폴드 — NDSD 자동화는 stub 구현. 실제 포털 자동화는 개발 예정.
+> **현재 상태** (v0.2.2): 운영 배포 중. NDSD 포털 자동 업로드·사후 검증·자동 업데이트 모두 활성화. 프로토콜 v1.2 ([PROTOCOL.md](docs/PROTOCOL.md)).
 
 ## 다운로드 · 설치
 
@@ -40,8 +40,9 @@
 1. PharmSquare(또는 호환 시스템)로부터 Deep Link(`openpharm://`)를 수신
 2. 서버에서 대체조제 행 데이터(JSON)를 조회
 3. NDSD 공식 13컬럼 엑셀로 변환
-4. NDSD 포털에 자동 업로드
-5. 결과(접수번호)를 서버로 콜백 전송
+4. NPKI 인증서로 NDSD 포털에 자동 로그인 후 업로드
+5. 업로드 직후 "대체조제 통보 내역 조회"로 등재 여부를 사후 검증
+6. 결과(접수번호·사후 검증 요약)를 서버로 콜백 전송
 
 ## 기술 스택
 
@@ -91,31 +92,28 @@ npm run make
 ```
 src/
 ├─ main/
-│  ├─ index.ts          # Electron main 진입점
-│  ├─ deeplink.ts       # openpharm:// 파싱·검증
-│  ├─ payload.ts        # GET /payload 호출
-│  ├─ callback.ts       # POST /callback 전송
-│  ├─ preload.ts        # contextBridge (window.ndsdUploader)
-│  ├─ excel/
-│  │  ├─ buildSheet.ts      # NdsdBatchRow[] → xlsx Buffer
-│  │  └─ buildSheet.test.ts # 유닛테스트
-│  ├─ automation/
-│  │  ├─ ndsd.ts            # NDSD 자동화 (현재: stub)
-│  │  └─ selectors.json     # NDSD UI 셀렉터 (placeholder)
-│  └─ mock/
-│     └─ mockUploader.ts    # MOCK 모드 업로더
-├─ renderer/
-│  ├─ index.html / index.tsx / App.tsx
-│  ├─ pages/
-│  │  ├─ WaitingDeepLink.tsx
-│  │  ├─ Confirm.tsx
-│  │  ├─ UploadProgress.tsx
-│  │  └─ Result.tsx
-│  └─ components/
-│     └─ RowPreviewTable.tsx
-└─ shared/
-   ├─ payload.ts   # PayloadResponse, NdsdBatchRow 타입
-   └─ callback.ts  # CallbackRequest 타입
+│  ├─ index.ts         # Electron main 진입점
+│  ├─ window.ts        # BrowserWindow 생성/복원
+│  ├─ tray.ts          # 트레이 아이콘·컨텍스트 메뉴
+│  ├─ deeplink.ts      # openpharm:// 파싱·검증
+│  ├─ payload.ts       # GET /payload 호출
+│  ├─ callback.ts      # POST /callback 전송
+│  ├─ manualUpload.ts  # 수동 엑셀 업로드 경로
+│  ├─ notify.ts        # OS 알림
+│  ├─ preload.ts       # contextBridge (window.ndsdUploader)
+│  ├─ ipc.ts           # IPC 채널·타입
+│  ├─ jobs/            # 잡 실행·큐·HTTP/file/none 콜백 디스패처·사후 검증 스케줄러
+│  ├─ excel/           # 13컬럼 xlsx 생성 + 단위 테스트
+│  ├─ automation/      # 비공개 @pharmsq/ndsd-automation 리졸버 (실제 로직은 비공개 패키지)
+│  ├─ cert/            # NPKI 스캔·저장·safeStorage 암복호화
+│  ├─ certModal/       # 인증서 선택 모달 라이프사이클
+│  ├─ verify/          # 포털 통보 내역 대조 엔진
+│  ├─ history/         # 업로드 이력 CRUD
+│  ├─ settings/        # 설정 저장소
+│  ├─ log/             # 로그 버퍼·파일 롤링
+│  └─ update/          # electron-updater 기반 자동 업데이트 + 버전 가드
+├─ renderer/           # React 18 UI
+└─ shared/             # payload/callback 타입 (공개 계약)
 ```
 
 ## 공개 계약
@@ -148,7 +146,7 @@ src/
 오픈소스 프로젝트이지만 배포물 변조를 막기 위해 다음 보호 장치를 사용합니다:
 
 - **Electron Fuses**: `OnlyLoadAppFromAsar` + `EnableEmbeddedAsarIntegrityValidation` — 설치 후 asar 번들을 임의로 교체하면 실행되지 않습니다.
-- **자동 업데이트**: 공식 배포 채널에서만 업데이트를 받습니다 (서버 구축 후 활성화).
+- **자동 업데이트**: GitHub Releases 기반 공식 채널에서만 업데이트를 받습니다. `deploy/manifest.json` 의 `minVersion` 으로 구버전 업로드를 차단할 수 있습니다.
 
 코드를 수정해서 사용하려면 직접 빌드해야 하며, 수정된 빌드물은 공식 업데이트 경로와 격리됩니다.
 

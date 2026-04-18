@@ -9,7 +9,7 @@
  *   npm start
  *
  *   # 다른 터미널
- *   curl -X POST http://localhost:4500/api/substitution/batch/demo-1/issue-token
+ *   curl -X POST http://localhost:4500/api/content/substitution/batch/demo-1/issue-token
  *   # → deepLinkUrl 이 출력되면 Windows 에서 cmd:
  *   #     start "" "openpharm://ndsd-upload?batchId=demo-1&token=..."
  */
@@ -100,13 +100,13 @@ function getBearer(req) {
 }
 
 /* ─── 1) 토큰 발급 + 딥링크 ──────────────────────────────────── */
-app.post('/api/substitution/batch/:id/issue-token', (req, res) => {
+app.post('/api/content/substitution/batch/:id/issue-token', (req, res) => {
   const batch = batches.get(req.params.id);
   if (!batch) return res.status(404).json({ message: '배치를 찾을 수 없습니다.' });
 
   const payloadRaw = issueToken(batch.batchId, 'PAYLOAD', 60);
   const expiresAt = new Date(Date.now() + 60 * 60 * 1000).toISOString();
-  const callbackUrl = `${BASE}/api/substitution/batch/${batch.batchId}/callback`;
+  const callbackUrl = `${BASE}/api/content/substitution/batch/${batch.batchId}/callback`;
   const deepLinkUrl =
     `openpharm://ndsd-upload` +
     `?batchId=${encodeURIComponent(batch.batchId)}` +
@@ -118,7 +118,7 @@ app.post('/api/substitution/batch/:id/issue-token', (req, res) => {
 });
 
 /* ─── 2) payload 조회 ──────────────────────────────────────── */
-app.get('/api/substitution/batch/:id/payload', (req, res) => {
+app.get('/api/content/substitution/batch/:id/payload', (req, res) => {
   const consumed = consumeToken(getBearer(req), req.params.id, 'PAYLOAD');
   if (!consumed.ok) return res.status(consumed.status).json({ message: consumed.message });
 
@@ -144,7 +144,7 @@ app.get('/api/substitution/batch/:id/payload', (req, res) => {
     },
     rows: batch.rows,
     callback: {
-      url: `${BASE}/api/substitution/batch/${batch.batchId}/callback`,
+      url: `${BASE}/api/content/substitution/batch/${batch.batchId}/callback`,
       token: cbRaw,
       expiresAt: cbExpiresAt,
     },
@@ -152,7 +152,7 @@ app.get('/api/substitution/batch/:id/payload', (req, res) => {
 });
 
 /* ─── 3) 콜백 수신 ─────────────────────────────────────────── */
-app.post('/api/substitution/batch/:id/callback', (req, res) => {
+app.post('/api/content/substitution/batch/:id/callback', (req, res) => {
   const consumed = consumeToken(getBearer(req), req.params.id, 'CALLBACK');
   if (!consumed.ok) return res.status(consumed.status).json({ message: consumed.message });
 
@@ -190,7 +190,7 @@ app.post('/api/substitution/batch/:id/callback', (req, res) => {
 });
 
 /* ─── 디버그: 배치 상태 조회 ─────────────────────────────────── */
-app.get('/api/substitution/batch/:id', (req, res) => {
+app.get('/api/content/substitution/batch/:id', (req, res) => {
   const batch = batches.get(req.params.id);
   if (!batch) return res.status(404).json({ message: 'not found' });
   res.json(batch);
@@ -199,10 +199,10 @@ app.get('/api/substitution/batch/:id', (req, res) => {
 app.get('/', (_req, res) => {
   res.type('text/plain').send(
     `pharmsq-ndsd reference server\n\n` +
-    `POST /api/substitution/batch/:id/issue-token  → deepLinkUrl\n` +
-    `GET  /api/substitution/batch/:id/payload      (Bearer required)\n` +
-    `POST /api/substitution/batch/:id/callback     (Bearer required)\n` +
-    `GET  /api/substitution/batch/:id              (debug view)\n\n` +
+    `POST /api/content/substitution/batch/:id/issue-token  → deepLinkUrl\n` +
+    `GET  /api/content/substitution/batch/:id/payload      (Bearer required)\n` +
+    `POST /api/content/substitution/batch/:id/callback     (Bearer required)\n` +
+    `GET  /api/content/substitution/batch/:id              (debug view)\n\n` +
     `Demo batch id: demo-1\n`
   );
 });
