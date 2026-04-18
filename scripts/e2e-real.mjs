@@ -27,7 +27,9 @@ const ROOT = path.join(LOCALAPPDATA, 'OpenPharm', 'NDSD');
 const JOBS = path.join(ROOT, 'jobs');
 const RESULTS = path.join(ROOT, 'results');
 const HISTORY = path.join(APPDATA, 'pharmsq-ndsd', 'upload-history.json');
-const EXE = path.resolve('out/pharmsq-ndsd-win32-x64/pharmsq-ndsd.exe');
+const EXE = process.env.PHARMSQ_NDSD_EXE
+  ? path.resolve(process.env.PHARMSQ_NDSD_EXE)
+  : path.resolve('out/pharmsq-ndsd-win32-x64/pharmsq-ndsd.exe');
 
 mkdirSync(JOBS, { recursive: true });
 mkdirSync(RESULTS, { recursive: true });
