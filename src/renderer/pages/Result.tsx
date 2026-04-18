@@ -4,16 +4,19 @@
  * 부분실패/실패: 에러 배너 + 실패 행 리스트 + [다시 시도 / 닫기]
  */
 
-import React from 'react';
+import React, { useState } from 'react';
 import type { CallbackRequest, PerRowResult } from '../../shared/callback';
+import type { VerificationResult } from '../../shared/verification';
 import { button, chip, color, font, gradient, radius, shadow, text } from '../theme';
 
 interface Props {
   result: CallbackRequest;
+  verification?: VerificationResult | null;
   onClose: () => void;
+  onRetryVerify?: () => Promise<void>;
 }
 
-export default function Result({ result, onClose }: Props): React.ReactElement {
+export default function Result({ result, verification, onClose, onRetryVerify }: Props): React.ReactElement {
   const isSuccess = result.status === 'SUCCESS';
   const isPartial = result.status === 'PARTIAL';
   const failedRows = result.perRow.filter((r) => r.status === 'FAILED');
@@ -38,6 +41,9 @@ export default function Result({ result, onClose }: Props): React.ReactElement {
             subTitle={subTitle}
             failedRows={failedRows}
           />
+        )}
+        {verification !== undefined && verification !== null && (
+          <VerificationPanel verification={verification} onRetry={onRetryVerify} />
         )}
       </div>
     </div>
@@ -180,6 +186,72 @@ function FailureLayout({
         </button>
       </div>
     </>
+  );
+}
+
+function VerificationPanel({
+  verification,
+  onRetry,
+}: {
+  verification: VerificationResult;
+  onRetry?: () => Promise<void>;
+}): React.ReactElement {
+  const [busy, setBusy] = useState(false);
+  const { summary, session, totalBatchRows, totalPortalRows } = verification;
+  const allMatched =
+    session !== 'FAILED' && summary.missing === 0 && summary.mismatch === 0 && summary.matched > 0;
+  const sessionFailed = session === 'FAILED';
+
+  const handleRetry = async () => {
+    if (!onRetry || busy) return;
+    setBusy(true);
+    try { await onRetry(); } finally { setBusy(false); }
+  };
+
+  let headline: string;
+  let tone: React.CSSProperties;
+  if (sessionFailed) {
+    headline = '포털 세션이 만료되어 사후 검증을 건너뛰었습니다. 업로드 자체는 완료되었습니다.';
+    tone = { background: '#FFF4E5', color: '#8A4B00' };
+  } else if (allMatched) {
+    headline = `포털 등재 확인 완료 · ${summary.matched}건 일치`;
+    tone = { background: '#E6F4EA', color: '#0B6B3A' };
+  } else {
+    const parts: string[] = [];
+    if (summary.missing > 0) parts.push(`미등재 ${summary.missing}건`);
+    if (summary.mismatch > 0) parts.push(`불일치 ${summary.mismatch}건`);
+    if (summary.extra > 0) parts.push(`포털 단독 ${summary.extra}건`);
+    headline = parts.join(' · ') || '검증 결과 이상 없음';
+    tone = { background: '#FEECEC', color: '#8A1A1A' };
+  }
+
+  return (
+    <div style={{ marginTop: 20 }}>
+      <div style={{ ...styles.verifyHeadline, ...tone }}>
+        <span style={{ fontWeight: 700 }}>사후 검증</span>
+        <span>{headline}</span>
+      </div>
+      {!sessionFailed && (
+        <div style={styles.verifyGrid}>
+          <StatCard label="일치" value={`${summary.matched}건`} />
+          <StatCard label="미등재" value={`${summary.missing}건`} />
+          <StatCard label="불일치" value={`${summary.mismatch}건`} />
+          <StatCard label="포털 단독" value={`${summary.extra}건`} />
+        </div>
+      )}
+      <div style={styles.verifyMeta}>
+        <span>포털 행 {totalPortalRows} · 배치 행 {totalBatchRows}</span>
+        {onRetry && (
+          <button
+            style={{ ...button.ghost, padding: '6px 12px', fontSize: 12 }}
+            onClick={handleRetry}
+            disabled={busy}
+          >
+            {busy ? '검증 중...' : '다시 검증'}
+          </button>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -351,6 +423,29 @@ const styles: Record<string, React.CSSProperties> = {
     margin: 0,
     paddingLeft: 16,
     ...text.bodySm,
+    color: color.onSurfaceVariant,
+  },
+
+  verifyHeadline: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: 10,
+    padding: '10px 14px',
+    borderRadius: radius.md,
+    fontSize: 13,
+    marginBottom: 10,
+  },
+  verifyGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(4, 1fr)',
+    gap: 8,
+    marginBottom: 10,
+  },
+  verifyMeta: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    fontSize: 11,
     color: color.onSurfaceVariant,
   },
 };

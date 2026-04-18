@@ -15,6 +15,11 @@ export default function History(): React.ReactElement {
   const [preview, setPreview] = useState<string | null>(null);
   const [errorDetail, setErrorDetail] = useState<{ batchId: string; message: string } | null>(null);
   const [filter, setFilter] = useState<StatusFilter>('all');
+  const [confirm, setConfirm] = useState<
+    | { kind: 'one'; id: string; label: string }
+    | { kind: 'all' }
+    | null
+  >(null);
 
   const ERROR_PREVIEW_LEN = 32;
 
@@ -54,14 +59,21 @@ export default function History(): React.ReactElement {
             <Tab active={filter === 'failed'} onClick={() => setFilter('failed')} label="실패" count={counts.failed} />
             <Tab active={filter === 'cancelled'} onClick={() => setFilter('cancelled')} label="취소됨" count={counts.cancelled} />
           </div>
-          <button
-            style={button.secondary}
-            onClick={() => {
-              window.location.hash = '#/';
-            }}
-          >
-            + New Upload
-          </button>
+          <div style={{ display: 'flex', gap: 8 }}>
+            {entries.length > 0 && (
+              <button style={button.ghost} onClick={() => setConfirm({ kind: 'all' })}>
+                전체 삭제
+              </button>
+            )}
+            <button
+              style={button.secondary}
+              onClick={() => {
+                window.location.hash = '#/';
+              }}
+            >
+              + New Upload
+            </button>
+          </div>
         </div>
 
         {filtered.length === 0 ? (
@@ -82,6 +94,7 @@ export default function History(): React.ReactElement {
                   <th style={styles.th}>상태</th>
                   <th style={styles.th}>접수번호 / 오류</th>
                   <th style={styles.th}>스크린샷</th>
+                  <th style={styles.th}></th>
                 </tr>
               </thead>
               <tbody>
@@ -117,7 +130,10 @@ export default function History(): React.ReactElement {
                       )}
                     </td>
                     <td style={styles.td}>
-                      <StatusPill status={e.status} />
+                      <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-start' }}>
+                        <StatusPill status={e.status} />
+                        {e.verification && <VerifyPill verdict={e.verification.verdict} />}
+                      </div>
                     </td>
                     <td style={styles.td}>
                       {e.status === 'success' || e.status === 'partial' ? (
@@ -149,6 +165,21 @@ export default function History(): React.ReactElement {
                         '-'
                       )}
                     </td>
+                    <td style={styles.td}>
+                      <button
+                        style={styles.deleteBtn}
+                        title="이력 삭제"
+                        onClick={() =>
+                          setConfirm({
+                            kind: 'one',
+                            id: e.id,
+                            label: `${formatDate(e.timestamp)} ${formatTime(e.timestamp)} · ${e.batchId}`,
+                          })
+                        }
+                      >
+                        삭제
+                      </button>
+                    </td>
                   </tr>
                 ))}
               </tbody>
@@ -160,6 +191,46 @@ export default function History(): React.ReactElement {
       {preview && (
         <div style={styles.modal} onClick={() => setPreview(null)}>
           <img src={`file:///${preview.replace(/\\/g, '/')}`} alt="스크린샷" style={styles.modalImg} />
+        </div>
+      )}
+
+      {confirm && (
+        <div style={styles.modal} onClick={() => setConfirm(null)}>
+          <div style={styles.errorDialog} onClick={(ev) => ev.stopPropagation()}>
+            <div style={styles.errorDialogHeader}>
+              <div>
+                <div style={{ ...text.title }}>
+                  {confirm.kind === 'all' ? '전체 이력 삭제' : '이력 삭제'}
+                </div>
+                {confirm.kind === 'one' && (
+                  <div style={styles.errorDialogBatch}>{confirm.label}</div>
+                )}
+              </div>
+              <button style={styles.closeBtn} onClick={() => setConfirm(null)}>✕</button>
+            </div>
+            <div style={{ padding: '4px 24px 20px', color: color.onSurfaceVariant, fontSize: 13 }}>
+              {confirm.kind === 'all'
+                ? `${entries.length}건의 이력과 연결된 스크린샷 파일이 모두 삭제됩니다. 되돌릴 수 없습니다.`
+                : '선택한 이력과 연결된 스크린샷 파일이 삭제됩니다. 되돌릴 수 없습니다.'}
+            </div>
+            <div style={styles.errorDialogFooter}>
+              <button style={button.ghost} onClick={() => setConfirm(null)}>취소</button>
+              <button
+                style={{ ...button.primary, background: color.error }}
+                onClick={async () => {
+                  if (confirm.kind === 'all') {
+                    await window.ndsdUploader.clearHistory();
+                  } else {
+                    await window.ndsdUploader.deleteHistoryEntry(confirm.id);
+                  }
+                  setConfirm(null);
+                  await reload();
+                }}
+              >
+                삭제
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
@@ -235,6 +306,22 @@ function StatusPill({ status }: { status: UploadHistoryEntry['status'] }): React
   if (status === 'success') return <span style={{ ...chip.base, ...chip.success }}>● 성공</span>;
   if (status === 'partial') return <span style={{ ...chip.base, ...chip.warning }}>◐ 부분실패</span>;
   return <span style={{ ...chip.base, ...chip.error }}>● 실패</span>;
+}
+
+function VerifyPill({
+  verdict,
+}: {
+  verdict: NonNullable<UploadHistoryEntry['verification']>['verdict'];
+}): React.ReactElement {
+  const map: Record<typeof verdict, { label: string; tone: React.CSSProperties }> = {
+    ALL_MATCHED: { label: '✓ 포털 일치', tone: { background: '#E6F4EA', color: '#0B6B3A' } },
+    HAS_MISSING: { label: '⚠ 미등재', tone: { background: '#FFF4E5', color: '#8A4B00' } },
+    HAS_MISMATCH: { label: '⚠ 불일치', tone: { background: '#FEECEC', color: '#8A1A1A' } },
+    SKIPPED: { label: '— 검증생략', tone: { background: color.surfaceContainerLow, color: color.onSurfaceVariant } },
+    FAILED: { label: '검증실패', tone: { background: '#FEECEC', color: '#8A1A1A' } },
+  };
+  const { label, tone } = map[verdict];
+  return <span style={{ ...styles.verifyPill, ...tone }}>{label}</span>;
 }
 
 function formatDate(iso: string): string {
@@ -404,6 +491,17 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'flex-end',
     padding: '16px 24px',
   },
+  deleteBtn: {
+    background: 'transparent',
+    border: `1px solid ${color.surfaceContainerHigh}`,
+    color: color.error,
+    cursor: 'pointer',
+    padding: '4px 10px',
+    fontSize: 12,
+    fontFamily: font.body,
+    fontWeight: 600,
+    borderRadius: radius.pill,
+  },
   closeBtn: {
     background: 'transparent',
     border: 'none',
@@ -412,5 +510,13 @@ const styles: Record<string, React.CSSProperties> = {
     cursor: 'pointer',
     padding: 4,
     lineHeight: 1,
+  },
+  verifyPill: {
+    display: 'inline-block',
+    fontSize: 10,
+    fontWeight: 600,
+    padding: '2px 8px',
+    borderRadius: 999,
+    letterSpacing: '0.02em',
   },
 };

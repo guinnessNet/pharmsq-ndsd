@@ -1,23 +1,25 @@
 /**
  * NDSD 13컬럼 테스트 파일을 xlsx / xlsm / xls / csv 로 생성.
- * 출력: C:\Users\jaehyun\Downloads\ndsd-test-*.*
+ * 출력: ./tests/artifacts/ndsd-test-*.*
+ *
+ * 샘플 값은 모두 합성 placeholder (실제 환자/의료기관/약품과 무관).
  */
 import ExcelJS from 'exceljs';
 import * as XLSX from 'xlsx';
 import * as fs from 'fs';
 import * as path from 'path';
 
-const OUT_DIR = 'C:/Users/jaehyun/Downloads';
+const OUT_DIR = path.resolve('tests/artifacts');
 const HEADERS = [
   '연번', '처방전교부번호', '처방요양기관기호', '처방일', '대체조제일',
   '의사면허번호', '처방전-보험등재구분', '처방전-약품명', '처방전-약품코드',
   '대체조제-보험등재구분', '대체조제-약품명', '대체조제-약품코드', '비고',
 ];
 const ROWS = [
-  [1, '2026041601001', '41376811', '20260416', '20260416', '111950', 1,
-   '타이레놀정500밀리그램', '662505150', 1, '써스펜정500밀리그램', '662504450', ''],
-  [2, '2026041601002', '41376811', '20260416', '20260416', '111950', 1,
-   '대원아시클로버정[0.2g/1정]', '671800550', 1, '국제아시클로버정[0.2g/1정]', '643700570', '테스트'],
+  [1, '20260416M0001', '99999901', '20260416', '20260416', '00001', 1,
+   'MOCK-Original-A', '100000001', 1, 'MOCK-Substitute-A', '200000001', ''],
+  [2, '20260416M0002', '99999901', '20260416', '20260416', '00001', 1,
+   'MOCK-Original-B', '100000002', 1, 'MOCK-Substitute-B', '200000002', '테스트'],
 ];
 
 async function genXlsx(ext: 'xlsx' | 'xlsm') {
@@ -49,6 +51,7 @@ function genCsv() {
 }
 
 async function main() {
+  fs.mkdirSync(OUT_DIR, { recursive: true });
   await genXlsx('xlsx');
   await genXlsx('xlsm');
   genXls();

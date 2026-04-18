@@ -14,6 +14,8 @@ import type {
 } from '../main/ipc';
 import type { UploadHistoryEntry } from '../main/history/store';
 import type { UpdateStatus } from '../shared/update';
+import type { NdsdBatchRow } from '../shared/payload';
+import type { VerificationResult } from '../shared/verification';
 
 // window.ndsdUploader 브릿지 타입 선언 (preload.ts와 동기화)
 declare global {
@@ -58,6 +60,8 @@ declare global {
       testCertLogin: () => Promise<{ ok: boolean; error?: string }>;
       listHistory: () => Promise<UploadHistoryEntry[]>;
       acknowledgeHistory: () => Promise<void>;
+      deleteHistoryEntry: (id: string) => Promise<boolean>;
+      clearHistory: () => Promise<void>;
       onHistoryUpdated: (cb: () => void) => () => void;
       pickManualFile: () => Promise<ManualPickResult>;
       dropManualFile: (filePath: string) => Promise<ManualPickResult>;
@@ -69,6 +73,10 @@ declare global {
       onUpdateStatusChanged: (cb: (status: UpdateStatus) => void) => () => void;
       openLogsFolder: () => Promise<string>;
       getLogFilePath: () => Promise<string>;
+      retryVerification: (args: {
+        batchId: string;
+        rows: NdsdBatchRow[];
+      }) => Promise<VerificationResult>;
     };
   }
 }
@@ -99,6 +107,7 @@ export interface UploadProgressEvent {
 /** 업로드 완료 이벤트 */
 export interface UploadCompleteEvent {
   result: CallbackRequest;
+  verification?: VerificationResult;
 }
 
 /** 업로드 오류 이벤트 */
@@ -122,6 +131,7 @@ export interface AppState {
   payload: PayloadResponse | null;
   progress: UploadProgressEvent | null;
   result: CallbackRequest | null;
+  verification: VerificationResult | null;
   error: string | null;
   /** 인증서 선택 모달이 떠있으면 요청 정보, 닫혀있으면 null */
   certRequest: CertRequestEvent | null;

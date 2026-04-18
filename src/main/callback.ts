@@ -4,7 +4,7 @@
  * POST ${callbackInfo.url}
  * Authorization: Bearer ${callbackInfo.token}
  *
- * 참고: ELECTRON_MODULE_CONTRACT.md §5
+ * 참고: 비공개 패키지 내부 문서 참조
  */
 
 import axios from 'axios';

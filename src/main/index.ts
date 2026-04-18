@@ -19,18 +19,21 @@ import {
   PAYLOAD_RESULT,
   UPLOAD_START,
   UPLOAD_ERROR,
+  VERIFY_RETRY,
   type PayloadResultPayload,
   type UploadErrorPayload,
 } from './ipc';
+import type { NdsdBatchRow } from '../shared/payload';
 import type { PayloadResponse } from '../shared/payload';
 import { showWindow, getMainWindow } from './window';
 import { createTray, refreshTray, destroyTray } from './tray';
 import { registerSettingsIpc, applyAutoStart } from './settings/ipc';
 import { registerCertIpc } from './cert/ipc';
 import { registerHistoryIpc } from './history/ipc';
+import { reconcileScreenshotPaths } from './history/store';
 import { isFirstRun, loadSettings } from './settings/store';
 import { registerManualUploadIpc } from './manualUpload';
-import { runJob } from './jobs/runner';
+import { runJob, runVerification } from './jobs/runner';
 import { ensureDirs, readJobSpec, jobPath } from './jobs/paths';
 import { runGc } from './jobs/gc';
 import { startWatcher } from './jobs/watcher';
@@ -43,8 +46,10 @@ import { startAutoUpdater } from './update/autoUpdater';
 import { startVersionGuard } from './update/versionGuard';
 import { registerUpdateIpc } from './update/ipc';
 
+// Squirrel 이벤트(--squirrel-install/updated/uninstall)는 바로 종료.
+// app.quit() 은 async 라 모듈 평가가 계속되므로 창이 잠깐 뜰 수 있다 — app.exit(0) 로 즉시 종료.
 // eslint-disable-next-line @typescript-eslint/no-require-imports
-if (require('electron-squirrel-startup')) app.quit();
+if (require('electron-squirrel-startup')) app.exit(0);
 
 /** 딥링크로 수신하여 preview 용으로 캐싱된 JobSpec. UPLOAD_START 가 이걸로 runJob 호출. */
 let cachedJobSpec: JobSpec | null = null;
@@ -59,6 +64,9 @@ const MODULE_VERSION: string = (() => {
 })();
 
 // ── Single Instance Lock ─────────────────────────────────────────────────────
+// 2차 프로세스는 argv(딥링크 포함) 를 primary 에 전달한 뒤 종료해야 한다.
+// app.exit(0) 은 너무 빨라 argv 포워딩 IPC 가 끊기므로 app.quit() 사용.
+// 대신 whenReady 콜백을 gotTheLock 가드로 감싸 showWindow 가 실행되어 창이 깜빡이는 일이 없도록 한다.
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
   app.quit();
@@ -67,16 +75,31 @@ if (!gotTheLock) {
 // ── Deep Link 스킴 등록 ───────────────────────────────────────────────────────
 app.setAsDefaultProtocolClient('openpharm');
 
+// ── Windows AppUserModelID ────────────────────────────────────────────────────
+// Toast 알림이 Action Center 에 정상 등록되려면 AUMID 가 필요.
+// Squirrel 설치 시 shortcut 에 AUMID 가 심어지지만, dev/portable 실행에서는
+// 누락되어 notifyInfo/notifyFailure 가 표시되지 않거나 "Electron" 로 표시됨.
+if (process.platform === 'win32') {
+  app.setAppUserModelId('com.pharmsq.ndsd-uploader');
+}
+
 function startedHidden(): boolean {
   return process.argv.includes('--hidden');
 }
 
-/** argv 에서 `--job <id>` 를 찾아 id 반환. 없으면 null. */
+const UUIDV4_RE =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+/**
+ * argv 에서 `--job <id>` 를 찾아 id 반환. 없으면 null.
+ * id 는 readJobSpec 이 `%LOCALAPPDATA%\...\{id}.json` 으로 합치므로 path traversal
+ * 방지를 위해 UUIDv4 만 허용.
+ */
 function parseJobArg(argv: string[]): string | null {
   const i = argv.indexOf('--job');
   if (i < 0 || i + 1 >= argv.length) return null;
   const id = argv[i + 1];
-  if (!id || id.startsWith('--')) return null;
+  if (!id || !UUIDV4_RE.test(id)) return null;
   return id;
 }
 
@@ -181,9 +204,24 @@ async function onDeepLink(url: string): Promise<void> {
     console.log('[main] JobSpec 캐싱 완료 jobId=', spec.jobId);
   } catch (err) {
     console.error('[main] payload 조회 실패:', err);
+    const win = showWindow('upload');
+    broadcastDeepLink(win, url);
+    return;
   }
   const win = showWindow('upload');
   broadcastDeepLink(win, url);
+  // v2 file-drop 과 동일하게 자동 실행 — 버튼 클릭 불필요.
+  // cachedJobSpec 을 즉시 소비해 UPLOAD_START 버튼으로 인한 중복 실행 차단
+  // (UPLOAD_START 핸들러는 cachedJobSpec 이 null 이면 "payload 없음" 으로 귀결).
+  const spec = cachedJobSpec!;
+  cachedJobSpec = null;
+  if (inFlightJobs.has(spec.jobId)) {
+    console.log('[main] auto-run 스킵 (이미 실행 중):', spec.jobId);
+    return;
+  }
+  inFlightJobs.add(spec.jobId);
+  void runJob({ jobSpec: spec, win, moduleVersion: MODULE_VERSION })
+    .finally(() => inFlightJobs.delete(spec.jobId));
 }
 
 /**
@@ -235,7 +273,9 @@ app.on('second-instance', (_event, argv) => {
 let stopWatcher: (() => void) | null = null;
 
 // ── 앱 부팅 ──────────────────────────────────────────────────────────────────
-app.whenReady().then(() => {
+// 2차 프로세스(gotTheLock=false)는 argv 포워딩 후 곧 종료되므로 whenReady 핸들러를
+// 아예 등록하지 않아 showWindow 로 창이 깜빡이는 일이 없게 한다.
+if (gotTheLock) app.whenReady().then(() => {
   // Electron 기본 애플리케이션 메뉴(파일/편집/보기/...)를 숨긴다 — 트레이 메뉴로 통일.
   Menu.setApplicationMenu(null);
 
@@ -245,6 +285,14 @@ app.whenReady().then(() => {
   // 로그 IPC
   ipcMain.handle(LOG_OPEN_FOLDER, async () => openLogsFolder());
   ipcMain.handle(LOG_GET_PATH, () => currentLogFile());
+
+  // 사후 검증 재시도 — 결과 화면에서 사용자가 "다시 검증" 눌렀을 때.
+  ipcMain.handle(
+    VERIFY_RETRY,
+    async (_event, args: { batchId: string; rows: NdsdBatchRow[] }) => {
+      return runVerification({ batchId: args.batchId, rows: args.rows });
+    },
+  );
 
   try {
     ensureDirs();
@@ -262,6 +310,12 @@ app.whenReady().then(() => {
 
   registerSettingsIpc();
   registerCertIpc();
+  try {
+    const n = reconcileScreenshotPaths();
+    if (n > 0) console.log(`[history] 복구된 스크린샷 경로: ${n}`);
+  } catch (e) {
+    console.warn('[history] 스크린샷 경로 복구 실패', e);
+  }
   registerHistoryIpc(() => refreshTray());
   registerManualUploadIpc(() => getMainWindow(), MODULE_VERSION);
   registerUpdateIpc();

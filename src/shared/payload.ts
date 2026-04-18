@@ -4,7 +4,7 @@
  * 서버 계약: GET ${serverBaseUrl}/api/content/substitution/batch/:batchId/payload
  * Authorization: Bearer <token>
  *
- * 참고: ELECTRON_MODULE_CONTRACT.md §3
+ * 참고: 비공개 패키지 내부 문서 참조
  */
 
 /**

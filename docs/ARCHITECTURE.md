@@ -64,4 +64,4 @@ REAL 모드의 구체적인 자동화 단계·URL·셀렉터는 비공개 패키
 
 - `PROTOCOL.md` — payload/callback 계약 (공개판)
 - `INSTALL.md` — Deep Link 등록 방법
-- `../docs/plans/substitution/ELECTRON_MODULE_CONTRACT.md` — 원본 설계 (내부)
+- 원본 설계 및 상세 자동화 플로우: 비공개 패키지 내부 문서 참조

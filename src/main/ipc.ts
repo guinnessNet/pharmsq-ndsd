@@ -49,6 +49,7 @@ export const CERT_CANCELLED = 'cert:cancelled';
 import type { PayloadResponse } from '../shared/payload';
 import type { CallbackRequest } from '../shared/callback';
 import type { CertInfo } from '../shared/automation';
+import type { VerificationResult } from '../shared/verification';
 
 /**
  * DEEPLINK_RECEIVED 페이로드.
@@ -90,7 +91,15 @@ export interface UploadProgressPayload {
 /** UPLOAD_COMPLETE 페이로드 */
 export interface UploadCompletePayload {
   result: CallbackRequest;
+  /**
+   * 업로드 성공/부분성공 시에만 포함. 포털 "대체조제 통보 내역 조회"
+   * 데이터와 대조한 사후 검증 결과.
+   */
+  verification?: VerificationResult;
 }
+
+/** renderer → main: 사후 검증 재시도 (invoke) */
+export const VERIFY_RETRY = 'verify:retry';
 
 /** UPLOAD_ERROR 페이로드 */
 export interface UploadErrorPayload {
@@ -140,6 +149,10 @@ export const CERT_TEST = 'cert:test';
 export const HISTORY_LIST = 'history:list';
 /** renderer → main: 실패 뱃지 확인 처리 (invoke) */
 export const HISTORY_ACK = 'history:ack';
+/** renderer → main: 단일 이력 삭제 (invoke, id 인자) */
+export const HISTORY_DELETE = 'history:delete';
+/** renderer → main: 전체 이력 삭제 (invoke) */
+export const HISTORY_CLEAR = 'history:clear';
 /** main → renderer: 새 이력 추가됨 */
 export const HISTORY_UPDATED = 'history:updated';
 

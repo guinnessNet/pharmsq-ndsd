@@ -26,6 +26,8 @@ import {
   CERT_TEST,
   HISTORY_LIST,
   HISTORY_ACK,
+  HISTORY_DELETE,
+  HISTORY_CLEAR,
   HISTORY_UPDATED,
   MANUAL_PICK,
   MANUAL_DROP,
@@ -36,6 +38,7 @@ import {
   UPDATE_STATUS_CHANGED,
   LOG_OPEN_FOLDER,
   LOG_GET_PATH,
+  VERIFY_RETRY,
   type DeepLinkReceivedPayload,
   type DeepLinkErrorPayload,
   type PayloadResultPayload,
@@ -52,6 +55,8 @@ import {
   type ManualPickResult,
 } from './ipc';
 import type { UpdateStatus } from '../shared/update';
+import type { NdsdBatchRow } from '../shared/payload';
+import type { VerificationResult } from '../shared/verification';
 
 function onChannel<T>(
   channel: string,
@@ -105,6 +110,9 @@ const api = {
   // 이력
   listHistory: () => ipcRenderer.invoke(HISTORY_LIST),
   acknowledgeHistory: () => ipcRenderer.invoke(HISTORY_ACK),
+  deleteHistoryEntry: (id: string): Promise<boolean> =>
+    ipcRenderer.invoke(HISTORY_DELETE, id),
+  clearHistory: (): Promise<void> => ipcRenderer.invoke(HISTORY_CLEAR),
   onHistoryUpdated: (cb: () => void) => onChannel(HISTORY_UPDATED, () => cb()),
 
   // 수동 업로드
@@ -131,6 +139,10 @@ const api = {
   // 로그
   openLogsFolder: (): Promise<string> => ipcRenderer.invoke(LOG_OPEN_FOLDER),
   getLogFilePath: (): Promise<string> => ipcRenderer.invoke(LOG_GET_PATH),
+
+  // 사후 검증 재시도
+  retryVerification: (args: { batchId: string; rows: NdsdBatchRow[] }): Promise<VerificationResult> =>
+    ipcRenderer.invoke(VERIFY_RETRY, args),
 };
 
 contextBridge.exposeInMainWorld('ndsdUploader', api);

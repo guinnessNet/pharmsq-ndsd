@@ -11,3 +11,8 @@ tests/artifacts/
 docs/internal/
 **/.local-feed/
 scripts/debug-trigger.ts
+
+# Claude Code / Playwright MCP 런타임 아티팩트 — 포털 스냅샷·콘솔 로그가
+# 남을 수 있으므로 공개 레포에 절대 커밋 금지.
+.claude/scheduled_tasks.lock
+.playwright-mcp/

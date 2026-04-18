@@ -8,9 +8,12 @@
 import { type BrowserWindow, ipcMain } from 'electron';
 import { buildSheet } from '../excel/buildSheet';
 import { loadDriver } from '../automation';
+import { loadVerificationDriver } from '../verify/loader';
 import { promptCertSelection } from '../certModal/showCertDialog';
 import { appendEntry, saveScreenshot } from '../history/store';
-import { notifyFailure } from '../notify';
+import { notifyFailure, notifyInfo } from '../notify';
+import { ERROR_CODE_ALREADY_REGISTERED } from '../../shared/callback';
+import { decideHistoryStatus, decideNotification } from './decideNotification';
 import { setTrayState, refreshTray } from '../tray';
 import {
   UPLOAD_PROGRESS,
@@ -39,6 +42,11 @@ import type {
   NdsdBatchRow,
 } from '../../shared/payload';
 import type { CallbackRequest } from '../../shared/callback';
+import type { VerificationResult } from '../../shared/verification';
+import {
+  pollVerification,
+  toCallbackVerification,
+} from './verificationHelpers';
 
 interface ResolvedPayload {
   batch: BatchMeta;
@@ -82,6 +90,18 @@ async function dispatchCallback(
     return;
   }
   // 'none' with no inferred → 결과 파일만 남기고 외부 호출 없음
+}
+
+/**
+ * 사후 검증 래퍼. 드라이버 로드 + 백오프 폴링. VERIFY_RETRY IPC 에서도 재사용.
+ */
+export async function runVerification(params: {
+  batchId: string;
+  rows: NdsdBatchRow[];
+  signal?: AbortSignal;
+}): Promise<VerificationResult> {
+  const driver = await loadVerificationDriver();
+  return pollVerification({ driver, ...params });
 }
 
 export async function runJob(params: {
@@ -158,16 +178,44 @@ export async function runJob(params: {
       delayReason,
     });
 
+    // 사후 검증을 먼저 돌려서 콜백 바디에 요약을 포함시킨다 — 서버가 배치
+    // 상태를 보강하거나 불일치 알림을 트리거할 수 있게. SUCCESS/PARTIAL 에서만
+    // 실행하고, 드라이버 오류는 UX 를 막지 않는다(검증 실패는 SKIPPED 로 표기).
+    let verification: VerificationResult | undefined;
+    if (callbackBody.status === 'SUCCESS' || callbackBody.status === 'PARTIAL') {
+      progressMsg('포털 등재 확인 중...', 8);
+      try {
+        verification = await runVerification({
+          batchId: batch.batchId,
+          rows,
+          signal: abortController.signal,
+        });
+        callbackBody.verification = toCallbackVerification(verification);
+      } catch (e) {
+        console.warn('[runJob] 사후 검증 실패 (무시):', (e as Error).message);
+      }
+    }
+
     progressMsg('콜백 전송 중...', 8);
     await dispatchCallback(jobSpec, callbackBody, inferredCallback);
     progressMsg('완료', 9);
 
-    const status: 'success' | 'partial' | 'failed' =
-      callbackBody.status === 'SUCCESS'
-        ? 'success'
-        : callbackBody.status === 'PARTIAL'
-          ? 'partial'
-          : 'failed';
+    // ── 결과 분해: 중복(이미 통보)과 실 오류 분리 ────────────────────────────
+    // duplicateRows 는 드라이버가 직접 set 하지만, 구버전 호환을 위해 perRow
+    // (errorCode='ALREADY_REGISTERED') 에서도 재도출. 알림/이력 분기는
+    // decideNotification.ts 의 순수 함수에 위임.
+    const duplicateRows =
+      callbackBody.duplicateRows ??
+      callbackBody.perRow.filter(
+        (r) => r.status === 'FAILED' && r.errorCode === ERROR_CODE_ALREADY_REGISTERED,
+      ).length;
+    const notifInputs = {
+      totalRows: rows.length,
+      successRows: callbackBody.successRows,
+      failedRows: callbackBody.failedRows,
+      duplicateRows,
+    };
+    const historyStatus = decideHistoryStatus(notifInputs);
 
     const entry = appendEntry({
       source: jobSpec.source.type === 'http-fetch' ? 'deeplink' : 'manual',
@@ -175,22 +223,24 @@ export async function runJob(params: {
       rowCount: rows.length,
       successRows: callbackBody.successRows,
       failedRows: callbackBody.failedRows,
-      status,
+      status: historyStatus,
       hiraReceiptNo: callbackBody.hiraReceiptNo,
+      verification: callbackBody.verification,
     });
     if (callbackBody.screenshotBase64) saveScreenshot(entry.id, callbackBody.screenshotBase64);
 
-    if (status !== 'success') {
-      notifyFailure(
-        'NDSD 업로드 실패',
-        status === 'partial'
-          ? `부분 실패: ${callbackBody.failedRows}/${rows.length}건 오류`
-          : '업로드가 완료되지 않았습니다. 이력에서 상세를 확인해주세요.',
-      );
-    }
+    const notif = decideNotification(notifInputs);
+    console.log(
+      `[runJob] 결과 요약 total=${notifInputs.totalRows} success=${notifInputs.successRows} ` +
+        `duplicate=${duplicateRows} failed=${notifInputs.failedRows} ` +
+        `→ history=${historyStatus} notif=${notif.kind}`,
+    );
+    if (notif.kind === 'failure') notifyFailure(notif.title, notif.body);
+    else if (notif.kind === 'info') notifyInfo(notif.title, notif.body);
 
     win?.webContents.send(UPLOAD_COMPLETE, {
       result: callbackBody,
+      verification,
     } satisfies UploadCompletePayload);
 
     const result: JobResult = {

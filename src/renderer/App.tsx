@@ -9,6 +9,7 @@ import React, { useCallback, useEffect, useReducer, useState } from 'react';
 import type { AppState, AppPage, CertRequestEvent } from './types';
 import type { PayloadResponse } from '../shared/payload';
 import type { CallbackRequest } from '../shared/callback';
+import type { VerificationResult } from '../shared/verification';
 import WaitingDeepLink from './pages/WaitingDeepLink';
 import Confirm from './pages/Confirm';
 import UploadProgress from './pages/UploadProgress';
@@ -32,7 +33,7 @@ type Action =
   | { type: 'SET_PAGE'; page: AppPage }
   | { type: 'SET_PAYLOAD'; payload: PayloadResponse }
   | { type: 'SET_PROGRESS'; step: string; current: number; total: number }
-  | { type: 'SET_RESULT'; result: CallbackRequest }
+  | { type: 'SET_RESULT'; result: CallbackRequest; verification?: VerificationResult }
   | { type: 'SET_ERROR'; error: string }
   | { type: 'CLEAR_ERROR' }
   | { type: 'SET_CERT_REQUEST'; request: CertRequestEvent }
@@ -43,6 +44,7 @@ const initialState: AppState = {
   payload: null,
   progress: null,
   result: null,
+  verification: null,
   error: null,
   certRequest: null,
 };
@@ -60,7 +62,13 @@ function reducer(state: AppState, action: Action): AppState {
         progress: { step: action.step, current: action.current, total: action.total },
       };
     case 'SET_RESULT':
-      return { ...state, result: action.result, page: 'result', error: null };
+      return {
+        ...state,
+        result: action.result,
+        verification: action.verification ?? null,
+        page: 'result',
+        error: null,
+      };
     case 'SET_ERROR':
       return { ...state, error: action.error, page: 'error', certRequest: null };
     case 'CLEAR_ERROR':
@@ -127,7 +135,7 @@ export default function App(): React.ReactElement {
       dispatch({ type: 'SET_PROGRESS', ...prog });
     });
     const offComplete = bridge.onUploadComplete((evt) => {
-      dispatch({ type: 'SET_RESULT', result: evt.result });
+      dispatch({ type: 'SET_RESULT', result: evt.result, verification: evt.verification });
     });
     const offError = bridge.onUploadError((err) => {
       dispatch({ type: 'SET_ERROR', error: err.error });
@@ -206,7 +214,21 @@ export default function App(): React.ReactElement {
         );
       case 'result':
         if (!state.result) return <WaitingDeepLink loading />;
-        return <Result result={state.result} onClose={handleClose} />;
+        return (
+          <Result
+            result={state.result}
+            verification={state.verification}
+            onClose={handleClose}
+            onRetryVerify={async () => {
+              if (!state.payload || !state.result) return;
+              const next = await window.ndsdUploader.retryVerification({
+                batchId: state.result.batchId,
+                rows: state.payload.rows,
+              });
+              dispatch({ type: 'SET_RESULT', result: state.result, verification: next });
+            }}
+          />
+        );
       default:
         return <WaitingDeepLink loading={false} />;
     }
