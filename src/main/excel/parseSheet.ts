@@ -2,7 +2,10 @@
  * 사용자가 직접 만든 NDSD 13컬럼 엑셀 파일을 파싱하여 NdsdBatchRow[] 로 변환.
  *
  * 지원 포맷:
- *   - .xlsx / .xlsm : exceljs (OOXML)
+ *   - .xlsx / .xlsm : exceljs (OOXML). 비표준 OOXML(`<x:workbook>` 처럼 spreadsheetml
+ *                    네임스페이스에 prefix 를 붙이는 유팜 출력 등) 이면 exceljs 가
+ *                    "Cannot read properties of undefined (reading 'sheets')" 로 실패하므로
+ *                    SheetJS 로 fallback.
  *   - .csv          : exceljs (csv.readFile)
  *   - .xls          : SheetJS xlsx (legacy BIFF 전용)
  *
@@ -153,6 +156,24 @@ function parseWithSheetJs(filePath: string): unknown[][] {
   }) as unknown[][];
 }
 
+/**
+ * exceljs 가 유팜 비표준 OOXML 을 파싱하지 못할 때 나는 에러 시그니처.
+ * workbook.xml 의 `<x:sheets>` 를 로컬 태그 매칭 실패로 못 찾아 `model.sheets` 가
+ * undefined 가 된 결과. V8 은 버전에 따라 어순이 다르다:
+ *   - Node 16+ : `Cannot read properties of undefined (reading 'sheets')`
+ *   - Node 14- : `Cannot read property 'sheets' of undefined`
+ * 3 요소(`property` 단어, 따옴표 친 `sheets`, `undefined`)가 모두 있어야 매칭하도록
+ * AND 조건으로 구성해 오탐을 차단한다. 테스트용으로 export.
+ */
+export function isNonStandardXlsxError(e: unknown): boolean {
+  const msg = e instanceof Error ? e.message : String(e);
+  return (
+    /Cannot read propert(?:y|ies)/i.test(msg) &&
+    /['"]sheets['"]/.test(msg) &&
+    /undefined/.test(msg)
+  );
+}
+
 export async function parseSheet(filePath: string): Promise<NdsdBatchRow[]> {
   const ext = getSupportedExt(filePath);
   if (!ext) {
@@ -161,7 +182,22 @@ export async function parseSheet(filePath: string): Promise<NdsdBatchRow[]> {
     );
   }
 
-  const matrix =
-    ext === 'xls' ? parseWithSheetJs(filePath) : await parseWithExcelJs(filePath, ext);
+  let matrix: unknown[][];
+  if (ext === 'xls') {
+    matrix = parseWithSheetJs(filePath);
+  } else {
+    try {
+      matrix = await parseWithExcelJs(filePath, ext);
+    } catch (e) {
+      if (ext !== 'csv' && isNonStandardXlsxError(e)) {
+        console.log(
+          `[parseSheet] exceljs 실패 → SheetJS fallback (비표준 OOXML, 예: 유팜): ${filePath}`,
+        );
+        matrix = parseWithSheetJs(filePath);
+      } else {
+        throw e;
+      }
+    }
+  }
   return matrixToRows(matrix);
 }

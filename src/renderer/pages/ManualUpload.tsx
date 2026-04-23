@@ -302,16 +302,30 @@ export default function ManualUpload(): React.ReactElement {
 
 function MetaRow({ k, v, mono }: { k: string; v: string; mono?: boolean }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', fontSize: 12 }}>
-      <span style={{ color: color.onSurfaceVariant }}>{k}</span>
+    <div
+      style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        alignItems: 'flex-start',
+        gap: 8,
+        padding: '8px 0',
+        fontSize: 12,
+      }}
+    >
+      <span style={{ color: color.onSurfaceVariant, flexShrink: 0 }}>{k}</span>
       <span
         style={{
           color: color.onSurface,
           fontFamily: mono ? font.mono : font.body,
-          maxWidth: '65%',
-          overflow: 'hidden',
-          textOverflow: 'ellipsis',
-          whiteSpace: 'nowrap',
+          // flex:1 + minWidth:0 — 카드 폭은 그대로 두고 값만 남은 공간에서 여러 줄로 분할.
+          // wordBreak/overflowWrap — 언더스코어로 이어진 긴 파일명도 폭에 맞춰 줄바꿈.
+          flex: 1,
+          minWidth: 0,
+          textAlign: 'right',
+          wordBreak: 'break-all',
+          overflowWrap: 'anywhere',
+          whiteSpace: 'normal',
+          lineHeight: 1.4,
         }}
         title={v}
       >
@@ -336,7 +350,9 @@ function FooterItem({ label, value, dot }: { label: string; value: string; dot?:
 const styles: Record<string, React.CSSProperties> = {
   grid: {
     display: 'grid',
-    gridTemplateColumns: '1fr 1fr',
+    // minmax(0, 1fr) — intrinsic content size 가 아닌 실제 1:1 비율로 열 분배.
+    // 자식 컨텐츠(긴 파일명 등) 가 열을 밀어 불균형하게 만드는 것을 방지.
+    gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr)',
     gap: 16,
   },
   dropCard: {
@@ -420,9 +436,12 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 13,
     fontWeight: 600,
     color: color.onSurface,
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    whiteSpace: 'nowrap',
+    // 긴 파일명을 여러 줄로 분할. nowrap+ellipsis 는 부모 grid track 이 intrinsic
+    // content size 로 팽창해 오른쪽 카드를 찌그러뜨리는 원인이 됨.
+    wordBreak: 'break-all',
+    overflowWrap: 'anywhere',
+    whiteSpace: 'normal',
+    lineHeight: 1.35,
   },
   pickedMeta: { fontSize: 11, color: color.onSurfaceVariant, marginTop: 2 },
   iconBtn: {
