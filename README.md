@@ -23,7 +23,7 @@
 
 ---
 
-> **현재 상태** (v0.2.2): 운영 배포 중. NDSD 포털 자동 업로드·사후 검증·자동 업데이트 모두 활성화. 프로토콜 v1.2 ([PROTOCOL.md](docs/PROTOCOL.md)).
+> **현재 상태** (v0.2.5): 운영 배포 중. NDSD 포털 자동 업로드·사후 검증·자동 업데이트 모두 활성화. 프로토콜 v1.2 ([PROTOCOL.md](docs/PROTOCOL.md)). 변경 이력은 [CHANGELOG.md](CHANGELOG.md).
 
 ## 다운로드 · 설치
 

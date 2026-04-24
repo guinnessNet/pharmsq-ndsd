@@ -53,6 +53,18 @@ Electron Main Process (src/main/index.ts)
 REAL 모드의 구체적인 자동화 단계·URL·셀렉터는 비공개 패키지(`@pharmsq/ndsd-automation`) 내부에 은닉되어 있다.
 공개 모듈은 `AutomationDriver` 인터페이스(`src/shared/automation.ts`)로만 통신하며, 포털 구조를 알지 못한다.
 
+## 자동 업데이트
+
+| 컴포넌트 | 책임 | 위치 |
+|---|---|---|
+| `versionGuard` | 1시간 주기로 `manifest.json` 폴링 (`raw.githubusercontent` 직접 fetch). `minVersion` 미만이면 업로드 차단 | `src/main/update/versionGuard.ts` |
+| `autoUpdater` | Squirrel.Windows 의 `electron.autoUpdater` 를 wrapping. 다운로드 완료('downloaded') 상태는 sticky — 후속 'not-available' 로 덮어써지지 않음 | `src/main/update/autoUpdater.ts` |
+| `integrityCheck` | startup 1회 install root 스캔. 자기 버전보다 높은 `app-X.Y.Z` 폴더의 핵심 exe 누락/사이즈 미달 감지 → IntegrityIssue | `src/main/update/integrityCheck.ts` |
+| `forceReinstall` | latest Setup.exe 를 OS Temp 로 다운로드 후 detached spawn + 자기 종료. Squirrel installer 가 silent install + auto launch | `src/main/update/forceReinstall.ts` |
+| defer | "다음에" 클릭 시 `deferredVersion = manifest.latest` 저장. `userData/update-state.json` 에 persist | `autoUpdater.ts` 내 |
+
+UI 우선순위 (UpdateBadge): integrity > blocked > 새 버전 (deferred 아닐 때) > 다운로드 중 > notice.
+
 ## 보안
 
 - `nodeIntegration: false`, `contextIsolation: true`
