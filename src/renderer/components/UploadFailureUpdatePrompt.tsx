@@ -48,6 +48,10 @@ export default function UploadFailureUpdatePrompt(): React.ReactElement | null {
   if (!status.latest) return null;
   if (compareSemver(status.latest, status.currentVersion) <= 0) return null;
 
+  // 사용자가 "다음에" 미룬 같은 버전이면 자발적으로 안내 안 함 — 업로드 실패 컨텍스트는
+  // 미루기 의사가 적용되는 영역이므로 (긴급이면 사용자가 직접 설정 화면에서 적용)
+  if (status.deferredVersion === status.latest) return null;
+
   const renderCta = () => {
     if (status.state === 'downloaded') {
       return (

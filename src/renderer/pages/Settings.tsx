@@ -25,6 +25,7 @@ export default function Settings(): React.ReactElement {
   const [message, setMessage] = useState<{ kind: 'ok' | 'err'; text: string } | null>(null);
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus | null>(null);
   const [checking, setChecking] = useState(false);
+  const [reinstalling, setReinstalling] = useState(false);
 
   const reload = async () => {
     const [s, list, st] = await Promise.all([
@@ -289,12 +290,39 @@ export default function Settings(): React.ReactElement {
             <button style={button.secondary} onClick={handleCheckUpdate} disabled={checking}>
               {checking ? '확인 중...' : '지금 확인'}
             </button>
-            {updateStatus &&
+            {updateStatus?.integrity && (
+              <button
+                style={button.primary}
+                disabled={reinstalling}
+                onClick={async () => {
+                  setReinstalling(true);
+                  const r = await window.ndsdUploader.forceReinstall();
+                  if (!r.ok) {
+                    alert('재설치 실패: ' + (r.error ?? '알 수 없음'));
+                    setReinstalling(false);
+                  }
+                }}
+              >
+                {reinstalling ? '재설치 다운로드 중... (200MB+)' : '지금 재설치'}
+              </button>
+            )}
+            {!updateStatus?.integrity &&
+              updateStatus &&
               updateStatus.latest &&
               isHigherSemver(updateStatus.latest, updateStatus.currentVersion) && (
-                <button style={button.primary} onClick={() => window.ndsdUploader.applyUpdate()}>
-                  재시작하여 적용
-                </button>
+                <>
+                  <button style={button.primary} onClick={() => window.ndsdUploader.applyUpdate()}>
+                    재시작하여 적용
+                  </button>
+                  {updateStatus.deferredVersion !== updateStatus.latest && (
+                    <button
+                      style={button.secondary}
+                      onClick={() => window.ndsdUploader.deferUpdate()}
+                    >
+                      다음에
+                    </button>
+                  )}
+                </>
               )}
           </div>
         </section>
@@ -347,6 +375,9 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 }
 
 function describeState(s: UpdateStatus): string {
+  if (s.integrity) {
+    return `설치 손상 — 새 버전 ${s.integrity.brokenVersion} 강제 재설치 필요`;
+  }
   // manifest 가 알려주는 latest 가 현재 실행 버전보다 높다면 Squirrel state 와
   // 무관하게 "재시작 필요" 를 우선 안내. Squirrel 이 디스크에 새 버전을 이미
   // 깔아둔 채 'not-available' 을 발행하는 상황(트레이 상주로 인해 stub launcher
@@ -355,6 +386,9 @@ function describeState(s: UpdateStatus): string {
     if (s.state === 'checking') return '확인 중...';
     if (s.state === 'downloading') return `다운로드 중... (${s.latest})`;
     if (s.state === 'available') return `새 버전 발견 (${s.latest})`;
+    if (s.deferredVersion === s.latest) {
+      return `재시작 적용 미룸 — 새 버전 ${s.latest} 대기 중`;
+    }
     return `재시작 필요 — 새 버전 ${s.latest} 적용 대기`;
   }
   switch (s.state) {

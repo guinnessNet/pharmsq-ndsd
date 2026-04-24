@@ -35,6 +35,8 @@ import {
   UPDATE_GET_STATUS,
   UPDATE_CHECK,
   UPDATE_APPLY,
+  UPDATE_DEFER,
+  UPDATE_FORCE_REINSTALL,
   UPDATE_STATUS_CHANGED,
   LOG_OPEN_FOLDER,
   LOG_GET_PATH,
@@ -133,6 +135,9 @@ const api = {
   getUpdateStatus: (): Promise<UpdateStatus> => ipcRenderer.invoke(UPDATE_GET_STATUS),
   checkForUpdates: (): Promise<UpdateStatus> => ipcRenderer.invoke(UPDATE_CHECK),
   applyUpdate: (): Promise<void> => ipcRenderer.invoke(UPDATE_APPLY),
+  deferUpdate: (): Promise<UpdateStatus> => ipcRenderer.invoke(UPDATE_DEFER),
+  forceReinstall: (): Promise<{ ok: boolean; error?: string }> =>
+    ipcRenderer.invoke(UPDATE_FORCE_REINSTALL),
   onUpdateStatusChanged: (cb: (status: UpdateStatus) => void) =>
     onChannel<UpdateStatus>(UPDATE_STATUS_CHANGED, cb),
 

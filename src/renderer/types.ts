@@ -70,6 +70,8 @@ declare global {
       getUpdateStatus: () => Promise<UpdateStatus>;
       checkForUpdates: () => Promise<UpdateStatus>;
       applyUpdate: () => Promise<void>;
+      deferUpdate: () => Promise<UpdateStatus>;
+      forceReinstall: () => Promise<{ ok: boolean; error?: string }>;
       onUpdateStatusChanged: (cb: (status: UpdateStatus) => void) => () => void;
       openLogsFolder: () => Promise<string>;
       getLogFilePath: () => Promise<string>;

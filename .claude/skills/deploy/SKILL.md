@@ -26,7 +26,15 @@ description: Release a new pharmsq-ndsd (NDSD Uploader) version — rebuild the 
 2. **`minVersion` 변경 여부**
    - 하위 호환 변경 (기능 추가, 버그 수정): 그대로 유지
    - NDSD 포털 DOM 변경 등 **구버전이 못 쓰는 변경**: `minVersion` 을 신버전으로 — 구버전 사용자의 업로드가 차단된다
-3. **실행 중인 electron 종료** — `taskkill //F //IM electron.exe` (파일 잠금 방지)
+3. **모든 인스턴스 완전 종료** — 트레이 상주 0.2.x 인스턴스가 `pharmsq-ndsd.exe` (Squirrel stub) 를 lock 하면 `npm run make` 가 file in use 로 실패하거나, 더 나쁘게 release 후 hourly auto-update 시 mid-flight crash 로 빈 `app-X.Y.Z` 폴더가 만들어진다 (실제 사례 발생). **세 가지 모두** 종료해야 안전:
+   ```bash
+   taskkill //F //IM pharmsq-ndsd.exe  # 트레이 상주 (가장 흔한 lock 원인)
+   taskkill //F //IM electron.exe       # dev 모드 / forge start
+   taskkill //F //IM Update.exe         # 진행 중인 Squirrel update
+   sleep 2
+   tasklist //FI "IMAGENAME eq pharmsq-ndsd.exe" //FI "IMAGENAME eq electron.exe"
+   # 출력에 "일치하는 작업이 없습니다" 나와야 진행. 잔여 있으면 다시 taskkill 또는 작업관리자로 수동 종료
+   ```
 
 ---
 
@@ -182,7 +190,8 @@ gh release view pharmsq-ndsd-v<ver>
 
 | 증상 | 원인 | 대처 |
 |---|---|---|
-| `npm run make` 가 파일 잠김 에러 | 이전 electron 프로세스 살아 있음 | `taskkill //F //IM electron.exe` |
+| `npm run make` 가 파일 잠김 에러 | 이전 electron/트레이 프로세스 살아 있음 | 사전 체크 3번의 3종 taskkill 다시 실행. `tasklist` 로 잔여 0개 확인 후 재시도 |
+| release 후 일부 사용자 PC 의 `app-<신버전>` 폴더가 비고 단축키 무반응 | release 시점에 그 사용자가 트레이 상주 인스턴스를 띄워둬서 hourly check 가 mid-flight crash | 0.2.5+ 의 startup integrity check 가 자동 감지 후 "지금 재설치" 버튼 노출. 그 이전 버전 사용자는 Setup.exe 직접 재설치 안내 |
 | `release.sh` 가 "version 불일치" | bump 안 하고 스크립트 실행 | package.json 먼저 수정 |
 | `gh release create` 가 "tag already exists" | 동일 버전 재배포 시도 | `gh release delete <tag>` + `git tag -d <tag>` + `git push origin :refs/tags/<tag>` 후 재시도 |
 | 구버전 사용자에게 업로드가 차단됨 | `minVersion` 을 너무 공격적으로 올림 | manifest 수정 + 푸시 → 1시간 이내 사용자 앱이 재감지 |

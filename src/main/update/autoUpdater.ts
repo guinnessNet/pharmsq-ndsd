@@ -8,6 +8,8 @@
  */
 
 import { app, autoUpdater } from 'electron';
+import * as fs from 'node:fs';
+import * as path from 'node:path';
 import { getFeedBaseUrl } from './manifest';
 import {
   getCachedManifest,
@@ -19,7 +21,8 @@ import {
   getLastError,
 } from './versionGuard';
 import { compareSemver } from './semver';
-import type { UpdateState, UpdateStatus } from '../../shared/update';
+import { checkInstallIntegrity } from './integrityCheck';
+import type { IntegrityIssue, UpdateState, UpdateStatus } from '../../shared/update';
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
 const INITIAL_DELAY_MS = 5 * 1000; // 5 sec after boot
@@ -37,6 +40,45 @@ let lastCheckedAt: string | null = null;
 let checkStartedAt: number | null = null;
 let timer: NodeJS.Timeout | null = null;
 let listeners: Array<(s: UpdateStatus) => void> = [];
+/**
+ * 사용자가 "다음에 적용" 으로 미룬 버전. 같은 버전 동안은 재시작 권유 UI 가 노출되지 않음.
+ * userData/update-state.json 에 persist — 트레이 재시작 후에도 사용자의 미루기 의사 유지.
+ * 새 latest 가 발표되면 비교 결과 자동 무시되므로 별도 만료 로직 불필요.
+ */
+let deferredVersion: string | null = null;
+/** startup 시 1회 검증한 결과. forceReinstall 트리거 시 클리어. */
+let integrityIssue: IntegrityIssue | null = null;
+
+interface PersistedState {
+  deferredVersion?: string | null;
+}
+
+function statePath(): string {
+  return path.join(app.getPath('userData'), 'update-state.json');
+}
+
+function loadPersistedState(): void {
+  try {
+    const raw = fs.readFileSync(statePath(), 'utf-8');
+    const parsed = JSON.parse(raw) as PersistedState;
+    deferredVersion = parsed.deferredVersion ?? null;
+    if (deferredVersion) {
+      console.log(`[update] persisted deferredVersion 로드: ${deferredVersion}`);
+    }
+  } catch {
+    // 파일 없음 또는 파싱 실패 — 초기 상태 그대로
+  }
+}
+
+function savePersistedState(): void {
+  const data: PersistedState = { deferredVersion };
+  try {
+    fs.writeFileSync(statePath(), JSON.stringify(data), 'utf-8');
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn('[update] update-state.json 저장 실패:', msg);
+  }
+}
 
 function isSupportedPlatform(): boolean {
   // Squirrel.Windows 만 지원. 배포 대상.
@@ -58,7 +100,24 @@ export function getStatus(): UpdateStatus {
     notice: getActiveNotice(),
     lastCheckedAt: lastCheckedAt ?? getCachedFetchedAt(),
     error: stateError ?? getLastError(),
+    deferredVersion,
+    integrity: integrityIssue,
   };
+}
+
+export function deferLatestUpdate(): UpdateStatus {
+  const m = getCachedManifest();
+  // 미룰 대상이 latest 거나, manifest 가 없으면 현재 알려진 latest 가 없다는 뜻 → 그대로
+  deferredVersion = m?.latest ?? null;
+  console.log(`[update] 사용자가 적용을 미룸: ${deferredVersion ?? '(unknown)'}`);
+  savePersistedState();
+  setStatus(state, stateError); // 브로드캐스트만
+  return getStatus();
+}
+
+export function clearIntegrityIssue(): void {
+  integrityIssue = null;
+  setStatus(state, stateError);
 }
 
 export function onStatusChange(cb: (s: UpdateStatus) => void): () => void {
@@ -160,9 +219,24 @@ export function applyUpdate(): void {
 export function startAutoUpdater(version: string): void {
   moduleVersion = version;
 
+  // persisted 상태 로드 — dev 환경에서도 미루기 의사는 보존되어야 (사용자가 같은 PC 의
+  // dev/prod 를 동시 운영하지 않으니 영향 없음). isActive 가드 전에 호출.
+  loadPersistedState();
+
   if (!isActive()) {
     console.log('[update] 비활성화 (dev 또는 macOS/Linux)');
     return;
+  }
+
+  // startup 1회 무결성 검증 — 깨진 버전 폴더가 있으면 강제 재설치 안내
+  try {
+    integrityIssue = checkInstallIntegrity();
+    if (integrityIssue) {
+      console.warn(`[update] 무결성 이슈: ${integrityIssue.summary}`);
+    }
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    console.warn('[update] 무결성 검증 실패 (skip):', msg);
   }
 
   const feedUrl = `${getFeedBaseUrl()}`;

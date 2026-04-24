@@ -209,6 +209,10 @@ export const UPDATE_GET_STATUS = 'update:getStatus';
 export const UPDATE_CHECK = 'update:check';
 /** renderer → main: 다운로드된 업데이트 즉시 적용 (invoke, quitAndInstall) */
 export const UPDATE_APPLY = 'update:apply';
+/** renderer → main: 다운로드된 새 버전 적용을 다음 시간으로 미루기 (invoke) */
+export const UPDATE_DEFER = 'update:defer';
+/** renderer → main: 손상된 설치를 강제로 재설치 (Setup.exe 다운로드 + 자동 실행) (invoke) */
+export const UPDATE_FORCE_REINSTALL = 'update:forceReinstall';
 /** main → renderer: 업데이트 상태 변화 브로드캐스트 */
 export const UPDATE_STATUS_CHANGED = 'update:status-changed';
 

@@ -2,13 +2,15 @@
  * 업데이트 상태 배지.
  *
  * 표시 우선순위:
- *   1. blocked                    → 빨강, "업로드 차단 — 업데이트 필요"
- *   2. latest > currentVersion    → 파랑, "업데이트 준비됨 (재시작)" + 버튼
+ *   1. integrity issue            → 빨강, "설치 손상 — 강제 재설치" + 버튼 (가장 우선)
+ *   2. blocked                    → 빨강, "업로드 차단 — 업데이트 필요"
+ *   3. latest > currentVersion    → 파랑, "업데이트 준비됨 (재시작 / 다음에)" + 버튼들
  *      (Squirrel state 가 'downloaded' 든 'not-available' 든 무관 — 디스크에
  *       이미 새 버전이 깔려있을 수 있음을 manifest 기준으로 판단)
- *   3. available/downloading      → 회색, "업데이트 다운로드 중"
- *   4. notice.critical/warning    → level 색상 표시
- *   5. 그 외                      → null
+ *      deferredVersion === latest 면 이 배지는 숨김 (사용자가 미루기 선택함)
+ *   4. available/downloading      → 회색, "업데이트 다운로드 중"
+ *   5. notice.critical/warning    → level 색상 표시
+ *   6. 그 외                      → null
  */
 
 import React, { useEffect, useState } from 'react';
@@ -28,6 +30,7 @@ function isHigherSemver(a: string, b: string): boolean {
 
 export default function UpdateBadge(): React.ReactElement | null {
   const [status, setStatus] = useState<UpdateStatus | null>(null);
+  const [reinstalling, setReinstalling] = useState(false);
 
   useEffect(() => {
     let mounted = true;
@@ -45,6 +48,30 @@ export default function UpdateBadge(): React.ReactElement | null {
 
   if (!status) return null;
 
+  if (status.integrity) {
+    return (
+      <div style={{ ...badge, ...critical }}>
+        ⚠️ 새 버전 {status.integrity.brokenVersion} 설치가 중간에 끊겨 손상되었습니다. 다음 재시작 시
+        앱이 안 뜰 수 있습니다.{' '}
+        <button
+          style={reinstalling ? applyBtnBusy : applyBtn}
+          disabled={reinstalling}
+          onClick={async () => {
+            setReinstalling(true);
+            const r = await window.ndsdUploader.forceReinstall();
+            if (!r.ok) {
+              alert('재설치 실패: ' + (r.error ?? '알 수 없음'));
+              setReinstalling(false);
+            }
+            // 성공 시 1초 후 main 이 자동 종료하므로 reinstalling 유지
+          }}
+        >
+          {reinstalling ? '재설치 다운로드 중... (200MB+, 잠시 기다리세요)' : '지금 재설치'}
+        </button>
+      </div>
+    );
+  }
+
   if (status.blocked) {
     return (
       <div style={{ ...badge, ...critical }}>
@@ -54,13 +81,17 @@ export default function UpdateBadge(): React.ReactElement | null {
   }
 
   const hasNewer = !!status.latest && isHigherSemver(status.latest, status.currentVersion);
+  const deferred = !!status.latest && status.deferredVersion === status.latest;
 
-  if (hasNewer && status.state !== 'available' && status.state !== 'downloading') {
+  if (hasNewer && !deferred && status.state !== 'available' && status.state !== 'downloading') {
     return (
       <div style={{ ...badge, ...info }}>
         🔄 업데이트 {status.latest} 준비됨.{' '}
         <button style={applyBtn} onClick={() => window.ndsdUploader.applyUpdate()}>
           재시작하여 적용
+        </button>
+        <button style={deferBtn} onClick={() => window.ndsdUploader.deferUpdate()}>
+          다음에
         </button>
       </div>
     );
@@ -124,6 +155,22 @@ const applyBtn: React.CSSProperties = {
   background: '#2563eb',
   color: '#fff',
   border: 'none',
+  borderRadius: 6,
+  cursor: 'pointer',
+  fontSize: 12,
+};
+
+const applyBtnBusy: React.CSSProperties = {
+  ...applyBtn,
+  background: '#94a3b8',
+  cursor: 'not-allowed',
+};
+
+const deferBtn: React.CSSProperties = {
+  padding: '4px 10px',
+  background: 'transparent',
+  color: '#1e40af',
+  border: '1px solid #bfdbfe',
   borderRadius: 6,
   cursor: 'pointer',
   fontSize: 12,
