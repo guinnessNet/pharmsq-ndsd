@@ -18,6 +18,7 @@ import {
   getActiveNotice,
   getLastError,
 } from './versionGuard';
+import { compareSemver } from './semver';
 import type { UpdateState, UpdateStatus } from '../../shared/update';
 
 const CHECK_INTERVAL_MS = 60 * 60 * 1000; // 1 hour
@@ -68,6 +69,13 @@ export function onStatusChange(cb: (s: UpdateStatus) => void): () => void {
 }
 
 function setStatus(next: UpdateState, err: string | null = null): void {
+  // 'downloaded' 는 sticky — 한 번 다운로드 끝났다는 사실은 재시작 전까지 유지.
+  // Squirrel 이 다음 hourly check 에서 'not-available' 을 발행해도(이미 디스크에
+  // 새 버전이 깔려있으니 당연히 not-available) UI 의 "재시작 적용" 안내가 사라지면
+  // 사용자가 영원히 구버전에 머문다. 명시적 'error' 만 덮어쓰기 허용.
+  if (state === 'downloaded' && next !== 'downloaded' && next !== 'error') {
+    return;
+  }
   // 'checking' 에서 벗어나는 순간 타이밍 트래커 초기화 — 이후 수동 재시도가 가드에 막히지 않게
   if (next !== 'checking') {
     checkStartedAt = null;
@@ -125,11 +133,28 @@ export function checkForUpdates(): void {
 
 export function applyUpdate(): void {
   if (!isActive()) return;
-  if (state !== 'downloaded') {
-    console.warn('[update] 다운로드 완료 상태가 아닙니다. state=', state);
+
+  if (state === 'downloaded') {
+    autoUpdater.quitAndInstall();
     return;
   }
-  autoUpdater.quitAndInstall();
+
+  // Fallback: 메모리상 'downloaded' 가 아니어도, manifest 의 latest 가 현재
+  // 실행 버전보다 높으면 디스크에 새 버전이 이미 깔려있을 가능성이 매우 높다.
+  // (Squirrel 이 백그라운드에서 app-X.Y.Z 폴더를 만들어두고, 다음 hourly check
+  // 부터는 not-available 만 발행하므로 'downloaded' 상태가 휘발될 수 있음)
+  // 이 경우 stub launcher 가 자동으로 latest 폴더로 점프하므로 단순 relaunch 로 충분.
+  const m = getCachedManifest();
+  if (m && compareSemver(m.latest, moduleVersion) > 0) {
+    console.log(
+      `[update] state=${state} 이지만 latest(${m.latest}) > current(${moduleVersion}) — relaunch 로 새 버전 진입 시도`,
+    );
+    app.relaunch();
+    app.quit();
+    return;
+  }
+
+  console.warn('[update] 적용 가능한 새 버전이 없습니다. state=', state);
 }
 
 export function startAutoUpdater(version: string): void {

@@ -2,15 +2,29 @@
  * 업데이트 상태 배지.
  *
  * 표시 우선순위:
- *   1. blocked       → 빨강, "업로드 차단 — 업데이트 필요"
- *   2. downloaded    → 파랑, "업데이트 준비됨 (재시작)" + 버튼
- *   3. available/downloading → 회색, "업데이트 다운로드 중"
- *   4. notice.critical/warning → level 색상 표시
- *   5. idle + 최신 버전 → null (아무것도 렌더하지 않음)
+ *   1. blocked                    → 빨강, "업로드 차단 — 업데이트 필요"
+ *   2. latest > currentVersion    → 파랑, "업데이트 준비됨 (재시작)" + 버튼
+ *      (Squirrel state 가 'downloaded' 든 'not-available' 든 무관 — 디스크에
+ *       이미 새 버전이 깔려있을 수 있음을 manifest 기준으로 판단)
+ *   3. available/downloading      → 회색, "업데이트 다운로드 중"
+ *   4. notice.critical/warning    → level 색상 표시
+ *   5. 그 외                      → null
  */
 
 import React, { useEffect, useState } from 'react';
 import type { UpdateStatus } from '../../shared/update';
+
+function isHigherSemver(a: string, b: string): boolean {
+  const parse = (v: string): number[] =>
+    v.split('-')[0].split('.').map((s) => parseInt(s, 10) || 0);
+  const xs = parse(a);
+  const ys = parse(b);
+  for (let i = 0; i < 3; i++) {
+    const d = (xs[i] ?? 0) - (ys[i] ?? 0);
+    if (d !== 0) return d > 0;
+  }
+  return false;
+}
 
 export default function UpdateBadge(): React.ReactElement | null {
   const [status, setStatus] = useState<UpdateStatus | null>(null);
@@ -39,7 +53,9 @@ export default function UpdateBadge(): React.ReactElement | null {
     );
   }
 
-  if (status.state === 'downloaded') {
+  const hasNewer = !!status.latest && isHigherSemver(status.latest, status.currentVersion);
+
+  if (hasNewer && status.state !== 'available' && status.state !== 'downloading') {
     return (
       <div style={{ ...badge, ...info }}>
         🔄 업데이트 {status.latest} 준비됨.{' '}

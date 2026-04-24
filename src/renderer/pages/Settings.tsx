@@ -289,11 +289,13 @@ export default function Settings(): React.ReactElement {
             <button style={button.secondary} onClick={handleCheckUpdate} disabled={checking}>
               {checking ? '확인 중...' : '지금 확인'}
             </button>
-            {updateStatus?.state === 'downloaded' && (
-              <button style={button.primary} onClick={() => window.ndsdUploader.applyUpdate()}>
-                재시작하여 적용
-              </button>
-            )}
+            {updateStatus &&
+              updateStatus.latest &&
+              isHigherSemver(updateStatus.latest, updateStatus.currentVersion) && (
+                <button style={button.primary} onClick={() => window.ndsdUploader.applyUpdate()}>
+                  재시작하여 적용
+                </button>
+              )}
           </div>
         </section>
       </div>
@@ -345,6 +347,16 @@ function Toggle({ checked, onChange }: { checked: boolean; onChange: (v: boolean
 }
 
 function describeState(s: UpdateStatus): string {
+  // manifest 가 알려주는 latest 가 현재 실행 버전보다 높다면 Squirrel state 와
+  // 무관하게 "재시작 필요" 를 우선 안내. Squirrel 이 디스크에 새 버전을 이미
+  // 깔아둔 채 'not-available' 을 발행하는 상황(트레이 상주로 인해 stub launcher
+  // 가 호출된 적 없음)에서 사용자가 "최신 버전" 이라는 거짓 안내를 보지 않도록.
+  if (s.latest && isHigherSemver(s.latest, s.currentVersion)) {
+    if (s.state === 'checking') return '확인 중...';
+    if (s.state === 'downloading') return `다운로드 중... (${s.latest})`;
+    if (s.state === 'available') return `새 버전 발견 (${s.latest})`;
+    return `재시작 필요 — 새 버전 ${s.latest} 적용 대기`;
+  }
   switch (s.state) {
     case 'idle':
       return '대기';
@@ -363,6 +375,18 @@ function describeState(s: UpdateStatus): string {
     default:
       return s.state;
   }
+}
+
+function isHigherSemver(a: string, b: string): boolean {
+  const parse = (v: string): number[] =>
+    v.split('-')[0].split('.').map((s) => parseInt(s, 10) || 0);
+  const xs = parse(a);
+  const ys = parse(b);
+  for (let i = 0; i < 3; i++) {
+    const d = (xs[i] ?? 0) - (ys[i] ?? 0);
+    if (d !== 0) return d > 0;
+  }
+  return false;
 }
 
 const styles: Record<string, React.CSSProperties> = {

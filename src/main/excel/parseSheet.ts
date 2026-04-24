@@ -17,21 +17,34 @@ import * as path from 'node:path';
 import * as XLSX from 'xlsx';
 import type { NdsdBatchRow } from '../../shared/payload';
 
-const EXPECTED_HEADERS = [
-  '연번',
-  '처방전교부번호',
-  '처방요양기관기호',
-  '처방일',
-  '대체조제일',
-  '의사면허번호',
-  '처방전-보험등재구분',
-  '처방전-약품명',
-  '처방전-약품코드',
-  '대체조제-보험등재구분',
-  '대체조제-약품명',
-  '대체조제-약품코드',
-  '비고',
+/**
+ * 컬럼별 허용 헤더 표기. 첫 항목이 표준(에러 메시지에 사용), 나머지는 벤더별 변형.
+ *
+ * 동일 의미를 다른 단어로 표기하는 약국관리 프로그램들이 있다 — normalizeHeader 가
+ * 공백·하이픈·괄호만 제거하므로 단어 가감(예: "보험" 누락) 변형은 alias 로 흡수한다.
+ *
+ * 알려진 변형:
+ *   - 비즈팜  : col3="처방전요양기관"(기호 누락), col7/col10="등재구분"(보험 누락)
+ *   - 유팜    : 표준 표기 그대로 (헤더 변형 없음)
+ *   - 팜스퀘어/온팜/IT3000 : 표준 표기
+ */
+const EXPECTED_HEADER_ALIASES: readonly (readonly string[])[] = [
+  ['연번'],
+  ['처방전교부번호'],
+  ['처방요양기관기호', '처방전요양기관', '처방요양기관', '요양기관기호'],
+  ['처방일'],
+  ['대체조제일'],
+  ['의사면허번호'],
+  ['처방전-보험등재구분', '처방전등재구분'],
+  ['처방전-약품명'],
+  ['처방전-약품코드'],
+  ['대체조제-보험등재구분', '대체조제-등재구분', '대체조제등재구분'],
+  ['대체조제-약품명'],
+  ['대체조제-약품코드'],
+  ['비고'],
 ];
+
+const EXPECTED_COLUMN_COUNT = EXPECTED_HEADER_ALIASES.length;
 
 export const SUPPORTED_EXTENSIONS = ['xlsx', 'xlsm', 'xls', 'csv'] as const;
 export type SupportedExt = typeof SUPPORTED_EXTENSIONS[number];
@@ -74,11 +87,14 @@ function matrixToRows(matrix: unknown[][]): NdsdBatchRow[] {
   if (matrix.length === 0) throw new Error('엑셀 파일이 비어 있습니다.');
 
   const headers = matrix[0] ?? [];
-  for (let i = 0; i < EXPECTED_HEADERS.length; i++) {
+  for (let i = 0; i < EXPECTED_COLUMN_COUNT; i++) {
     const actual = asString(headers[i]);
-    if (normalizeHeader(actual) !== normalizeHeader(EXPECTED_HEADERS[i])) {
+    const actualNorm = normalizeHeader(actual);
+    const aliases = EXPECTED_HEADER_ALIASES[i];
+    const ok = aliases.some((alias) => normalizeHeader(alias) === actualNorm);
+    if (!ok) {
       throw new Error(
-        `헤더가 NDSD 양식과 다릅니다. ${i + 1}번째 컬럼 기대: "${EXPECTED_HEADERS[i]}" / 실제: "${actual}"`,
+        `헤더가 NDSD 양식과 다릅니다. ${i + 1}번째 컬럼 기대: "${aliases[0]}" / 실제: "${actual}"`,
       );
     }
   }
@@ -131,7 +147,7 @@ async function parseWithExcelJs(filePath: string, ext: SupportedExt): Promise<un
   for (let r = 1; r <= ws.rowCount; r++) {
     const row = ws.getRow(r);
     const cells: unknown[] = [];
-    for (let c = 1; c <= EXPECTED_HEADERS.length; c++) {
+    for (let c = 1; c <= EXPECTED_COLUMN_COUNT; c++) {
       cells.push(row.getCell(c).value);
     }
     matrix.push(cells);

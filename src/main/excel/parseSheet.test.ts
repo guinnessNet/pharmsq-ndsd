@@ -110,3 +110,47 @@ describe('isNonStandardXlsxError — fallback 오탐 방지', () => {
     expect(isNonStandardXlsxError({})).toBe(false);
   });
 });
+
+const BIZPHARM_FIXTURE = path.resolve(
+  __dirname,
+  '__fixtures__',
+  'bizpharm-style.xls',
+);
+
+describe('parseSheet — 비즈팜 헤더 변형 alias', () => {
+  it('"보험" 누락 / "기호" 누락 / "처방전요양기관" 표기에도 5행 모두 파싱한다', async () => {
+    const rows = await parseSheet(BIZPHARM_FIXTURE);
+    expect(rows).toHaveLength(5);
+  });
+
+  it('첫 행 필드가 정확히 매핑된다 (헤더 변형이 데이터 매핑에 영향 없음)', async () => {
+    const rows = await parseSheet(BIZPHARM_FIXTURE);
+    expect(rows[0]).toEqual({
+      rowIndex: 1,
+      issueNumber: '2026042100017',
+      hospitalCode: '12393291',
+      prescribedDate: '20260421',
+      substitutedDate: '20260423',
+      doctorLicenseNo: '105057',
+      originalInsuranceFlag: 1,
+      originalDrugName: '가짜정500밀리그램',
+      originalDrugCode: '100000001',
+      substituteInsuranceFlag: 1,
+      substituteDrugName: '가짜정-제네릭500',
+      substituteDrugCode: '200000001',
+      note: '',
+    });
+  });
+
+  it('insuranceFlag=0 행도 비즈팜 변형에서 정상 파싱', async () => {
+    const rows = await parseSheet(BIZPHARM_FIXTURE);
+    // 4번째 행: originalInsuranceFlag = substituteInsuranceFlag = 0
+    expect(rows[3].originalInsuranceFlag).toBe(0);
+    expect(rows[3].substituteInsuranceFlag).toBe(0);
+  });
+
+  it('비고가 채워진 행도 정상', async () => {
+    const rows = await parseSheet(BIZPHARM_FIXTURE);
+    expect(rows[2].note).toBe('비급여 대체');
+  });
+});
