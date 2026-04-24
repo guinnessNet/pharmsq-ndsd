@@ -1,7 +1,5 @@
 # INSTALL.md — 설치 및 Deep Link 등록
 
-> TODO: 이 문서는 placeholder입니다. 배포 패키지 완성 후 구체화 예정.
-
 ## 요구사항
 
 - Windows 10/11 또는 macOS 12+
