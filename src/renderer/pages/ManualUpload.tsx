@@ -5,6 +5,7 @@
 
 import React, { useEffect, useState } from 'react';
 import type { CallbackRequest } from '../../shared/callback';
+import { decideResultSummary } from '../../shared/resultSummary';
 import AppShell from '../components/AppShell';
 import UploadFailureUpdatePrompt from '../components/UploadFailureUpdatePrompt';
 import { button, chip, color, font, radius, shadow, text } from '../theme';
@@ -189,11 +190,16 @@ export default function ManualUpload(): React.ReactElement {
             </div>
           )}
 
-          {stage === 'done' && result && (
+          {stage === 'done' && result && (() => {
+            const summary = decideResultSummary(result);
+            return (
             <div style={styles.doneBox}>
               <div style={styles.doneBadge}>✓ 완료</div>
               <div style={{ ...text.title, marginTop: 12 }}>
-                {result.status} · 성공 {result.successRows} / 실패 {result.failedRows} / 전체 {result.totalRows}
+                {result.status} · 신규 {summary.successRows}
+                {summary.duplicateRows > 0 && ` / 중복 ${summary.duplicateRows}`}
+                {summary.realFailedRows > 0 && ` / 실패 ${summary.realFailedRows}`}
+                {' '}/ 전체 {summary.totalRows}
               </div>
               {result.hiraReceiptNo && (
                 <div style={{ ...styles.dropSub, marginTop: 4 }}>
@@ -204,7 +210,8 @@ export default function ManualUpload(): React.ReactElement {
                 다른 파일 업로드
               </button>
             </div>
-          )}
+            );
+          })()}
 
           {stage === 'error' && error && (
             <div style={styles.errorBox}>

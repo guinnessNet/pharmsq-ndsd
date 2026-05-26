@@ -2,11 +2,14 @@
  * Result 페이지.
  * 성공: 큰 체크 + 접수번호 + 3통계 + [이력 보기 / 닫기]
  * 부분실패/실패: 에러 배너 + 실패 행 리스트 + [다시 시도 / 닫기]
+ * 중복 행(errorCode='ALREADY_REGISTERED')은 실 오류와 분리해 별도 섹션·톤으로
+ * 안내한다 — 사용자 입장에서 "에러"가 아니라 "이미 통보됨" 상태이기 때문.
  */
 
 import React, { useState } from 'react';
 import type { CallbackRequest, PerRowResult } from '../../shared/callback';
 import type { VerificationResult } from '../../shared/verification';
+import { decideResultSummary, type ResultSummary } from '../../shared/resultSummary';
 import { button, chip, color, font, gradient, radius, shadow, text } from '../theme';
 
 interface Props {
@@ -17,30 +20,17 @@ interface Props {
 }
 
 export default function Result({ result, verification, onClose, onRetryVerify }: Props): React.ReactElement {
-  const isSuccess = result.status === 'SUCCESS';
-  const isPartial = result.status === 'PARTIAL';
-  const failedRows = result.perRow.filter((r) => r.status === 'FAILED');
-
-  const title = isSuccess ? '업로드 완료' : isPartial ? `부분 실패 (${result.failedRows}건)` : '업로드 실패';
-  const subTitle = isSuccess
-    ? '데이터 접수 및 전송이 성공적으로 마무리되었습니다.'
-    : isPartial
-      ? '업로드한 파일 중 일부 데이터에서 유효성 오류가 발견되었습니다. 아래 내용을 확인하고 약국 관리 프로그램에서 수정 후 다시 업로드해주세요.'
-      : '업로드에 실패했습니다. 아래 오류를 확인하세요.';
+  const summary = decideResultSummary(result);
+  const showSuccessLayout =
+    summary.kind === 'success' || summary.kind === 'partialSuccessWithDuplicates';
 
   return (
     <div style={styles.container}>
       <div style={styles.card}>
-        {isSuccess ? (
-          <SuccessLayout result={result} onClose={onClose} title={title} subTitle={subTitle} />
+        {showSuccessLayout ? (
+          <SuccessLayout result={result} summary={summary} onClose={onClose} />
         ) : (
-          <FailureLayout
-            result={result}
-            onClose={onClose}
-            title={title}
-            subTitle={subTitle}
-            failedRows={failedRows}
-          />
+          <FailureLayout result={result} summary={summary} onClose={onClose} />
         )}
         {verification !== undefined && verification !== null && (
           <VerificationPanel verification={verification} onRetry={onRetryVerify} />
@@ -52,14 +42,12 @@ export default function Result({ result, verification, onClose, onRetryVerify }:
 
 function SuccessLayout({
   result,
+  summary,
   onClose,
-  title,
-  subTitle,
 }: {
   result: CallbackRequest;
+  summary: ResultSummary;
   onClose: () => void;
-  title: string;
-  subTitle: string;
 }): React.ReactElement {
   const elapsed = formatElapsed(result.submittedAt);
 
@@ -71,8 +59,8 @@ function SuccessLayout({
             <path d="m5 13 5 5L20 7" />
           </svg>
         </div>
-        <h1 style={styles.heroTitle}>{title}</h1>
-        <p style={styles.heroSub}>{subTitle}</p>
+        <h1 style={styles.heroTitle}>{summary.title}</h1>
+        <p style={styles.heroSub}>{summary.subtitle}</p>
       </div>
 
       {result.hiraReceiptNo && (
@@ -90,9 +78,17 @@ function SuccessLayout({
       )}
 
       <div style={styles.statGrid}>
-        <StatCard label="성공 행" value={`${result.successRows}건`} />
-        <StatCard label="전체 행" value={`${result.totalRows}건`} />
-        <StatCard label="소요 시간" value={elapsed} />
+        <StatCard label="신규 통보" value={`${summary.successRows}건`} />
+        <StatCard label="이미 통보됨" value={`${summary.duplicateRows}건`} muted={summary.duplicateRows === 0} />
+        <StatCard label="전체" value={`${summary.totalRows}건`} />
+      </div>
+
+      {summary.duplicateRowsList.length > 0 && (
+        <DuplicateSection rows={summary.duplicateRowsList} />
+      )}
+
+      <div style={styles.metaRow}>
+        <span style={{ ...text.bodySm, color: color.onSurfaceVariant }}>소요 시간 · {elapsed}</span>
       </div>
 
       <div style={styles.actionRow}>
@@ -114,58 +110,64 @@ function SuccessLayout({
 
 function FailureLayout({
   result,
+  summary,
   onClose,
-  title,
-  subTitle,
-  failedRows,
 }: {
   result: CallbackRequest;
+  summary: ResultSummary;
   onClose: () => void;
-  title: string;
-  subTitle: string;
-  failedRows: PerRowResult[];
 }): React.ReactElement {
+  const isAllDuplicates = summary.kind === 'allDuplicates';
+  const chipStyle = isAllDuplicates ? chip.warning : chip.error;
+  const chipLabel = isAllDuplicates ? '전건 중복' : 'Amber Warning';
+
   return (
     <>
       <div style={styles.warnBanner}>
-        <span style={{ ...chip.base, ...chip.warning }}>
-          <span>⚠</span> Amber Warning
+        <span style={{ ...chip.base, ...chipStyle }}>
+          <span>⚠</span> {chipLabel}
         </span>
         <span style={{ fontFamily: font.mono, fontSize: 11, color: color.onSurfaceVariant, letterSpacing: '0.04em' }}>
           BATCH · {result.batchId}
         </span>
       </div>
 
-      <h1 style={{ ...text.headline, color: color.onSurface, marginTop: 14 }}>{title}</h1>
+      <h1 style={{ ...text.headline, color: color.onSurface, marginTop: 14 }}>{summary.title}</h1>
       <p style={{ ...text.bodySm, color: color.onSurfaceVariant, marginTop: 6, marginBottom: 20 }}>
-        {subTitle}
+        {summary.subtitle}
       </p>
 
-      <div style={styles.failList}>
-        {failedRows.slice(0, 8).map((row) => (
-          <div key={row.rowIndex} style={styles.failRow}>
-            <div style={styles.failBadge}>{row.rowIndex.toString().padStart(2, '0')}</div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={styles.failCode}>
-                오류 코드 · <span style={{ fontFamily: font.mono }}>{row.errorCode ?? '-'}</span>
-              </div>
-              <div style={styles.failMsg}>{row.errorMessage ?? '알 수 없는 오류'}</div>
-            </div>
-            <span style={styles.failArrow}>›</span>
-          </div>
-        ))}
-        {failedRows.length > 8 && (
-          <div style={{ ...text.bodySm, color: color.onSurfaceVariant, textAlign: 'center', padding: 10 }}>
-            외 {failedRows.length - 8}건 — 이력에서 전체 확인
-          </div>
-        )}
+      <div style={styles.statGrid}>
+        <StatCard label="신규 통보" value={`${summary.successRows}건`} muted={summary.successRows === 0} />
+        <StatCard label="이미 통보됨" value={`${summary.duplicateRows}건`} muted={summary.duplicateRows === 0} />
+        <StatCard label="오류" value={`${summary.realFailedRows}건`} muted={summary.realFailedRows === 0} />
       </div>
+
+      {summary.duplicateRowsList.length > 0 && (
+        <DuplicateSection rows={summary.duplicateRowsList} />
+      )}
+
+      {summary.realFailedRowsList.length > 0 && (
+        <FailureSection rows={summary.realFailedRowsList} />
+      )}
 
       <div style={styles.guideBox}>
         <div style={styles.guideTitle}>ℹ 조치 가이드</div>
         <ul style={styles.guideList}>
-          <li>오류 코드를 약국 관리 프로그램의 대체조제 내역에서 확인 후 수정하세요.</li>
-          <li>수정 후 [NDSD로 전송]을 다시 눌러 재업로드할 수 있습니다.</li>
+          {isAllDuplicates ? (
+            <>
+              <li>모든 행이 이미 NDSD에 통보된 상태입니다. 추가 조치가 필요하지 않습니다.</li>
+              <li>다른 날짜·기간의 엑셀을 올린 것은 아닌지 약국 관리 프로그램에서 확인해주세요.</li>
+            </>
+          ) : (
+            <>
+              <li>오류 코드를 약국 관리 프로그램의 대체조제 내역에서 확인 후 수정하세요.</li>
+              <li>수정 후 [NDSD로 전송]을 다시 눌러 재업로드할 수 있습니다.</li>
+              {summary.duplicateRows > 0 && (
+                <li>"이미 통보됨" 행은 재시도 대상이 아닙니다 — 자동 제외됩니다.</li>
+              )}
+            </>
+          )}
         </ul>
       </div>
 
@@ -186,6 +188,69 @@ function FailureLayout({
         </button>
       </div>
     </>
+  );
+}
+
+function DuplicateSection({ rows }: { rows: PerRowResult[] }): React.ReactElement {
+  return (
+    <div style={styles.sectionWrap}>
+      <div style={styles.sectionHeader}>
+        <span style={{ ...chip.base, ...chip.warning }}>이미 통보됨</span>
+        <span style={styles.sectionCount}>{rows.length}건</span>
+      </div>
+      <div style={styles.failList}>
+        {rows.slice(0, 8).map((row) => (
+          <div key={row.rowIndex} style={styles.failRow}>
+            <div style={{ ...styles.failBadge, ...styles.dupBadge }}>
+              {row.rowIndex.toString().padStart(2, '0')}
+            </div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={styles.failCode}>
+                상태 · <span style={{ fontFamily: font.mono }}>ALREADY_REGISTERED</span>
+              </div>
+              <div style={styles.failMsg}>
+                {row.errorMessage ?? '이미 NDSD에 통보된 처방입니다.'}
+              </div>
+            </div>
+          </div>
+        ))}
+        {rows.length > 8 && (
+          <div style={{ ...text.bodySm, color: color.onSurfaceVariant, textAlign: 'center', padding: 10 }}>
+            외 {rows.length - 8}건 — 이력에서 전체 확인
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function FailureSection({ rows }: { rows: PerRowResult[] }): React.ReactElement {
+  return (
+    <div style={styles.sectionWrap}>
+      <div style={styles.sectionHeader}>
+        <span style={{ ...chip.base, ...chip.error }}>오류</span>
+        <span style={styles.sectionCount}>{rows.length}건</span>
+      </div>
+      <div style={styles.failList}>
+        {rows.slice(0, 8).map((row) => (
+          <div key={row.rowIndex} style={styles.failRow}>
+            <div style={styles.failBadge}>{row.rowIndex.toString().padStart(2, '0')}</div>
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={styles.failCode}>
+                오류 코드 · <span style={{ fontFamily: font.mono }}>{row.errorCode ?? '-'}</span>
+              </div>
+              <div style={styles.failMsg}>{row.errorMessage ?? '알 수 없는 오류'}</div>
+            </div>
+            <span style={styles.failArrow}>›</span>
+          </div>
+        ))}
+        {rows.length > 8 && (
+          <div style={{ ...text.bodySm, color: color.onSurfaceVariant, textAlign: 'center', padding: 10 }}>
+            외 {rows.length - 8}건 — 이력에서 전체 확인
+          </div>
+        )}
+      </div>
+    </div>
   );
 }
 
@@ -255,11 +320,11 @@ function VerificationPanel({
   );
 }
 
-function StatCard({ label, value }: { label: string; value: string }): React.ReactElement {
+function StatCard({ label, value, muted }: { label: string; value: string; muted?: boolean }): React.ReactElement {
   return (
     <div style={styles.statCard}>
       <div style={styles.statLabel}>{label}</div>
-      <div style={styles.statValue}>{value}</div>
+      <div style={{ ...styles.statValue, ...(muted ? { color: color.onSurfaceVariant } : null) }}>{value}</div>
     </div>
   );
 }
@@ -345,7 +410,7 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'grid',
     gridTemplateColumns: 'repeat(3, 1fr)',
     gap: 10,
-    marginBottom: 20,
+    marginBottom: 16,
   },
   statCard: {
     background: color.surfaceContainerLow,
@@ -355,6 +420,12 @@ const styles: Record<string, React.CSSProperties> = {
   },
   statLabel: { ...text.labelXs, color: color.onSurfaceVariant, marginBottom: 6 },
   statValue: { fontFamily: font.display, fontSize: 20, fontWeight: 700, color: color.onSurface },
+
+  metaRow: {
+    display: 'flex',
+    justifyContent: 'flex-end',
+    marginBottom: 12,
+  },
 
   actionRow: {
     display: 'flex',
@@ -369,6 +440,16 @@ const styles: Record<string, React.CSSProperties> = {
     justifyContent: 'space-between',
     gap: 12,
   },
+  sectionWrap: {
+    marginBottom: 16,
+  },
+  sectionHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 8,
+  },
+  sectionCount: { ...text.bodySm, color: color.onSurfaceVariant },
   failList: {
     background: color.surfaceContainerLow,
     borderRadius: radius.md,
@@ -376,7 +457,6 @@ const styles: Record<string, React.CSSProperties> = {
     display: 'flex',
     flexDirection: 'column',
     gap: 4,
-    marginBottom: 16,
   },
   failRow: {
     display: 'flex',
@@ -399,6 +479,10 @@ const styles: Record<string, React.CSSProperties> = {
     alignItems: 'center',
     justifyContent: 'center',
     flexShrink: 0,
+  },
+  dupBadge: {
+    background: color.warningContainer,
+    color: color.onWarningContainer,
   },
   failCode: { fontSize: 12, color: color.onSurfaceVariant, fontWeight: 500 },
   failMsg: {
