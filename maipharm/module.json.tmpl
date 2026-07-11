@@ -1,0 +1,13 @@
+{
+  "$comment": "maipharm-core 모듈 패키지 manifest 템플릿 (메타 레포 contracts/module/manifest.v1). 패키징 시 __VERSION__을 package.json version으로 치환 — 에이전트 register.v1의 version과 일치해야 한다. provides 없음: 통보 트리거는 PROTOCOL v1 딥링크 단일 경로(이원화 금지).",
+  "id": "ndsd",
+  "name": "NDSD 대체조제 통보 (wrap)",
+  "version": "__VERSION__",
+  "tier": "free",
+  "run": "resident",
+  "provides": [],
+  "subscribes": [],
+  "health": { "intervalSec": 30, "timeoutMs": 3000 },
+  "minCoreVersion": "0.1.0",
+  "entry": "pharmsq-ndsd.exe"
+}
