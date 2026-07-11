@@ -1,6 +1,11 @@
 /**
  * E2E: 프로토콜(file-drop JobSpec + --job argv) 로 MOCK 업로드 + 검증 파이프라인 검증.
  *
+ * ⚠ 사전 조건: exe 는 반드시 **테스트 빌드**여야 한다 —
+ *   `NDSD_TEST_BUILD=1 npm run make` (또는 package).
+ *   운영 빌드는 MOCK/SPY 게이트가 빌드 타임에 봉인되어(webpack DefinePlugin)
+ *   NDSD_MOCK=1 이 무시되고 STUB 실패로 끝난다.
+ *
  * 흐름:
  *   1. jobId 생성
  *   2. JobSpec (4 교부번호, callback=file) 을 %LOCALAPPDATA%\OpenPharm\NDSD\jobs\{jobId}.json 에 기록
@@ -115,6 +120,12 @@ while (Date.now() < DEADLINE) {
 
 if (!result) {
   console.error('[e2e] ❌ 타임아웃: results 파일이 60초 내 생성되지 않음');
+  console.error('[e2e]   힌트: exe 가 운영 빌드면 MOCK 게이트가 봉인되어 STUB 실패한다 —');
+  console.error('[e2e]   `NDSD_TEST_BUILD=1 npm run make` 로 다시 빌드했는지 확인할 것.');
+  process.exit(1);
+}
+if (result.status === 'FAILED' && /자동화 패키지가 설치되지 않았습니다/.test(result.errorMessage ?? '')) {
+  console.error('[e2e] ❌ STUB 실패 — exe 가 테스트 빌드가 아님 (NDSD_TEST_BUILD=1 로 재빌드 필요)');
   process.exit(1);
 }
 

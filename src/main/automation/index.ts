@@ -9,13 +9,24 @@
  *   3. @pharmsq/ndsd-automation 설치되어 있으면 realDriver
  *   4. 위 셋 다 아니면 stubDriver (명확한 오류)
  *
+ * SPY·MOCK(무전송 SUCCESS 계열)은 둘 다 빌드 타임 게이트(NDSD_TEST_BUILD)
+ * 뒤에 있다 — 운영 배포본에서는 런타임 환경변수·CLI 플래그만으로 가짜
+ * 성공이 만들어질 수 없다(통보 완료 오기록 방지).
+ *
  * 참고: 비공개 패키지 내부 문서 참조
  */
 
 import type { AutomationDriver } from '../../shared/automation';
 
-/** NDSD_MOCK 환경변수 또는 --mock CLI 인수가 있으면 true */
+/**
+ * MOCK 모드 — NDSD_MOCK=1 환경변수 또는 --mock CLI 인수. SPY 와 동일한
+ * 빌드 타임 게이트가 선행된다: NDSD_TEST_BUILD=1 로 패키징(또는 실행)된
+ * 테스트 빌드에서만 열린다. webpack DefinePlugin 이 패키징 시점 값을
+ * 상수로 박아 넣으므로 운영 배포본에서는 이 함수가 항상 false 다.
+ * 개발·CI·e2e 는 `NDSD_TEST_BUILD=1 npm run package|make|start` 로 빌드한다.
+ */
 export function isMockMode(): boolean {
+  if (process.env.NDSD_TEST_BUILD !== '1') return false;
   if (process.env.NDSD_MOCK === '1') return true;
   if (process.argv.includes('--mock')) return true;
   return false;

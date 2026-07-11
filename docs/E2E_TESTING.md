@@ -12,13 +12,18 @@
 ## 사전 준비
 
 ```bash
-npm run make          # out/pharmsq-ndsd-win32-x64/pharmsq-ndsd.exe 생성
+NDSD_TEST_BUILD=1 npm run make   # out/pharmsq-ndsd-win32-x64/pharmsq-ndsd.exe 생성 (테스트 빌드)
 taskkill /F /IM pharmsq-ndsd.exe   # 기존 트레이 상주 인스턴스 있으면 종료
 ```
 
+> ⚠ **MOCK/SPY 는 테스트 빌드 전용이다.** `NDSD_TEST_BUILD=1` 없이 빌드한 운영 배포본은
+> 무전송 성공 계열 드라이버(MOCK·SPY)가 webpack DefinePlugin 빌드 타임 게이트로 봉인되어,
+> `NDSD_MOCK=1` 을 넣어도 STUB 실패로 끝난다(실업로드 없이 통보 완료로 오기록되는 사고 방지).
+> **릴리즈 배포(`npm run make` — deploy 절차)에는 이 플래그를 절대 넣지 말 것.**
+
 스크립트 둘 다 `out/pharmsq-ndsd-win32-x64/pharmsq-ndsd.exe` 경로를 가정한다.
-dev 실행으로 E2E 하려면 `electron-forge start` 를 따로 띄우고 스크립트의 `EXE` 상수를
-교체해서 `--job` 를 argv 로 주입하는 second-instance 로 전달할 것 (현재 스크립트는 패키지 exe 기준).
+dev 실행으로 E2E 하려면 `npm run start:mock`(NDSD_TEST_BUILD=1 포함) 을 따로 띄우고 스크립트의
+`EXE` 상수를 교체해서 `--job` 를 argv 로 주입하는 second-instance 로 전달할 것 (현재 스크립트는 패키지 exe 기준).
 
 ## e2e-verify.mjs — MOCK 회귀
 

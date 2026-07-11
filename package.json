@@ -6,7 +6,7 @@
   "main": ".webpack/main",
   "scripts": {
     "start": "electron-forge start",
-    "start:mock": "NDSD_MOCK=1 electron-forge start",
+    "start:mock": "NDSD_TEST_BUILD=1 NDSD_MOCK=1 electron-forge start",
     "package": "electron-forge package",
     "make": "electron-forge make",
     "test": "vitest run"

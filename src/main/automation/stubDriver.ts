@@ -16,7 +16,8 @@ import type { CallbackRequest } from '../../shared/callback';
 const STUB_ERROR_MESSAGE =
   'NDSD 자동화 패키지가 설치되지 않았습니다.\n' +
   '• 프로덕션 배포판: @pharmsq/ndsd-automation 이 포함되어야 합니다.\n' +
-  '• 개발 환경: NDSD_MOCK=1 환경변수로 MOCK 모드를 활성화하세요.';
+  '• 개발/테스트: NDSD_TEST_BUILD=1 로 빌드한 뒤 NDSD_MOCK=1 환경변수로 ' +
+  'MOCK 모드를 활성화하세요 (운영 빌드에서는 MOCK/SPY 가 봉인되어 있습니다).';
 
 async function upload(
   _params: AutomationUploadParams,

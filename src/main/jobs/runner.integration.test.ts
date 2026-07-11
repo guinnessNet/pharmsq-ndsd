@@ -462,21 +462,32 @@ describe('드라이버 선택 안전성', () => {
     delete process.env.NDSD_MOCK;
   });
 
-  it('운영 빌드 게이트: NDSD_TEST_BUILD 없으면 NDSD_SPY_DIR 이 있어도 SPY 비활성', async () => {
+  it('운영 빌드 게이트: NDSD_TEST_BUILD 없으면 SPY·MOCK 전부 비활성', async () => {
     // 운영 배포본 = NDSD_TEST_BUILD 미설정 상태로 패키징(DefinePlugin 상수 '').
-    // 이때 런타임 env 만으로 SPY 가 열리면 실제 업로드 없이 통보 완료로
-    // 오기록될 수 있다 — 반드시 닫혀 있어야 한다.
+    // 이때 런타임 env/플래그만으로 무전송 성공 계열(SPY·MOCK)이 열리면 실제
+    // 업로드 없이 통보 완료로 오기록될 수 있다 — 반드시 닫혀 있어야 한다.
     delete process.env.NDSD_TEST_BUILD;
     process.env.NDSD_SPY_DIR = spyRoot;
-    const { loadDriver, spyDir } = await import('../automation');
+    const { loadDriver, spyDir, isMockMode } = await import('../automation');
     expect(spyDir()).toBeNull();
 
     // MOCK 미설정 → STUB (자동화 패키지 부재 환경).
     delete process.env.NDSD_MOCK;
     expect((await loadDriver()).name).toBe('STUB');
 
-    // MOCK 설정 시에도 SPY 가 아니라 MOCK 이 선택된다.
+    // NDSD_MOCK=1 을 넣어도 MOCK 이 아니라 STUB — MOCK 도 봉인.
     process.env.NDSD_MOCK = '1';
+    expect(isMockMode()).toBe(false);
+    expect((await loadDriver()).name).toBe('STUB');
+    delete process.env.NDSD_MOCK;
+  });
+
+  it('테스트 빌드에서는 MOCK 유지 (NDSD_TEST_BUILD=1 + NDSD_MOCK=1)', async () => {
+    // beforeEach 가 NDSD_TEST_BUILD=1 을 설정한 상태 — 기존 개발·CI 워크플로
+    // (e2e-verify.mjs, start:mock)가 테스트 빌드에서 계속 동작함을 보장.
+    delete process.env.NDSD_SPY_DIR;
+    process.env.NDSD_MOCK = '1';
+    const { loadDriver } = await import('../automation');
     expect((await loadDriver()).name).toBe('MOCK');
     delete process.env.NDSD_MOCK;
   });

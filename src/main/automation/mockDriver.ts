@@ -1,7 +1,9 @@
 /**
  * MOCK 드라이버 — NDSD 접속 없이 즉시 성공 반환.
  *
- * 활성화: NDSD_MOCK=1 환경변수 또는 --mock CLI 플래그.
+ * 활성화: 테스트 빌드(NDSD_TEST_BUILD=1 로 빌드) 에서 NDSD_MOCK=1 환경변수
+ * 또는 --mock CLI 플래그. 운영 배포본에서는 빌드 타임 게이트가 닫혀 있어
+ * 활성화 불가 (automation/index.ts isMockMode 참조).
  * 용도: 오픈소스 기여자, CI, 로컬 개발.
  *
  * 참고: 비공개 패키지 내부 문서 참조

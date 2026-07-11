@@ -1,7 +1,8 @@
 /**
  * MOCK 검증 드라이버 — 포털 접속 없이 전 행을 MATCHED 로 반환.
  *
- * 활성화: NDSD_MOCK=1 또는 --mock. 개발·CI 파이프라인에서 검증 단계 통과용.
+ * 활성화: 테스트 빌드(NDSD_TEST_BUILD=1) 에서 NDSD_MOCK=1 또는 --mock.
+ * 개발·CI 파이프라인에서 검증 단계 통과용 — 운영 배포본에서는 봉인.
  */
 
 import type {
