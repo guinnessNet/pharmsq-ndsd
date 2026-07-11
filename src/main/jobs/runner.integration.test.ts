@@ -124,6 +124,9 @@ beforeEach(() => {
   spyRoot = path.join(workRoot, 'spy');
   // paths.ts 는 LOCALAPPDATA 를 호출 시점에 읽는다 — 테스트 루트로 격리.
   process.env.LOCALAPPDATA = path.join(workRoot, 'localappdata');
+  // SPY 는 이중 게이트: 테스트 빌드 플래그 + 디렉토리 (vitest 는 webpack 을
+  // 안 거치므로 빌드 플래그를 여기서 직접 준다).
+  process.env.NDSD_TEST_BUILD = '1';
   process.env.NDSD_SPY_DIR = spyRoot;
   delete process.env.NDSD_MOCK;
   ensureDirs();
@@ -131,6 +134,7 @@ beforeEach(() => {
 
 afterEach(() => {
   delete process.env.NDSD_SPY_DIR;
+  delete process.env.NDSD_TEST_BUILD;
   fs.rmSync(workRoot, { recursive: true, force: true });
 });
 
@@ -449,12 +453,31 @@ describe('드라이버 선택 안전성', () => {
     ).rejects.toThrow(/자동화 패키지가 설치되지 않았습니다/);
   });
 
-  it('NDSD_SPY_DIR 은 NDSD_MOCK=1 보다 우선한다', async () => {
+  it('NDSD_SPY_DIR 은 NDSD_MOCK=1 보다 우선한다 (테스트 빌드 한정)', async () => {
     process.env.NDSD_MOCK = '1';
     process.env.NDSD_SPY_DIR = spyRoot;
     const { loadDriver } = await import('../automation');
     const driver = await loadDriver();
     expect(driver.name).toBe('SPY');
+    delete process.env.NDSD_MOCK;
+  });
+
+  it('운영 빌드 게이트: NDSD_TEST_BUILD 없으면 NDSD_SPY_DIR 이 있어도 SPY 비활성', async () => {
+    // 운영 배포본 = NDSD_TEST_BUILD 미설정 상태로 패키징(DefinePlugin 상수 '').
+    // 이때 런타임 env 만으로 SPY 가 열리면 실제 업로드 없이 통보 완료로
+    // 오기록될 수 있다 — 반드시 닫혀 있어야 한다.
+    delete process.env.NDSD_TEST_BUILD;
+    process.env.NDSD_SPY_DIR = spyRoot;
+    const { loadDriver, spyDir } = await import('../automation');
+    expect(spyDir()).toBeNull();
+
+    // MOCK 미설정 → STUB (자동화 패키지 부재 환경).
+    delete process.env.NDSD_MOCK;
+    expect((await loadDriver()).name).toBe('STUB');
+
+    // MOCK 설정 시에도 SPY 가 아니라 MOCK 이 선택된다.
+    process.env.NDSD_MOCK = '1';
+    expect((await loadDriver()).name).toBe('MOCK');
     delete process.env.NDSD_MOCK;
   });
 });

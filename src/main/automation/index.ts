@@ -21,8 +21,21 @@ export function isMockMode(): boolean {
   return false;
 }
 
-/** NDSD_SPY_DIR 환경변수 — 설정 시 upload 인자를 그 디렉토리에 기록하는 SPY 모드 */
+/**
+ * NDSD_SPY_DIR — 통합 테스트 계측(SPY) 디렉토리. **이중 게이트**:
+ *
+ *   ① 빌드 타임: NDSD_TEST_BUILD=1 로 패키징된 테스트 빌드에서만 열린다.
+ *      webpack DefinePlugin 이 패키징 시점 값을 상수로 박아 넣으므로, 운영
+ *      배포본에서는 이 함수가 항상 null — 런타임 환경변수만으로 SPY(실제
+ *      업로드 없는 SUCCESS)가 활성화되어 통보 완료로 오기록되는 사고를
+ *      빌드 수준에서 차단한다.
+ *   ② 런타임: NDSD_SPY_DIR 환경변수 (기록 디렉토리).
+ *
+ * vitest 는 webpack 을 거치지 않으므로 테스트가 NDSD_TEST_BUILD=1 을 직접
+ * 설정한다.
+ */
 export function spyDir(): string | null {
+  if (process.env.NDSD_TEST_BUILD !== '1') return null;
   const dir = process.env.NDSD_SPY_DIR;
   return dir && dir.trim() !== '' ? dir : null;
 }
