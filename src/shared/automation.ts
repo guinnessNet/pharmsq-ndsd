@@ -10,7 +10,7 @@
 import type { NdsdBatchRow } from './payload';
 import type { CallbackRequest } from './callback';
 
-export type DriverName = 'MOCK' | 'STUB' | 'REAL';
+export type DriverName = 'MOCK' | 'STUB' | 'REAL' | 'SPY';
 
 export type ProgressCallback = (
   step: string,

@@ -15,7 +15,7 @@ import type {
   VerificationParams,
   VerificationResult,
 } from '../../shared/verification';
-import { isMockMode } from '../automation';
+import { isMockMode, spyDir } from '../automation';
 import { matchVerification } from './match';
 
 interface PortalQueryInput {
@@ -37,6 +37,13 @@ interface PortalQuerier {
 }
 
 export async function loadVerificationDriver(): Promise<VerificationDriver> {
+  // SPY 통합 테스트 모드: 포털 조회(사후 검증)도 절대 수행하지 않는다.
+  // stub 은 네트워크 접속 없이 session:'FAILED' 를 반환 → 검증 SKIP 처리.
+  if (spyDir()) {
+    const { stubVerificationDriver } = await import('./stubVerify');
+    return stubVerificationDriver;
+  }
+
   if (isMockMode()) {
     const { mockVerificationDriver } = await import('./mockVerify');
     return mockVerificationDriver;
