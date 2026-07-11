@@ -45,6 +45,7 @@ import * as fs from 'node:fs';
 import { startAutoUpdater } from './update/autoUpdater';
 import { startVersionGuard } from './update/versionGuard';
 import { registerUpdateIpc } from './update/ipc';
+import { startNdsdAgent, underMaipharmCore } from './maipharm/agent';
 
 // Squirrel 이벤트(--squirrel-install/updated/uninstall)는 바로 종료.
 // app.quit() 은 async 라 모듈 평가가 계속되므로 창이 잠깐 뜰 수 있다 — app.exit(0) 로 즉시 종료.
@@ -346,11 +347,21 @@ if (gotTheLock) app.whenReady().then(() => {
   registerManualUploadIpc(() => getMainWindow(), MODULE_VERSION);
   registerUpdateIpc();
 
-  // 자동 업데이트 시작 (dev/non-win32 에서는 no-op)
+  // 자동 업데이트·트레이 — 코어 관리 실행(maipharm-core spawn)에서는 코어로
+  // 이관(NDSD-01 wrap: 트레이 1개·업데이트 채널 1개 원칙). 단독 실행은 기존
+  // 그대로. versionGuard(구버전 업로드 차단)는 두 모드 모두 유지 — 실행
+  // 주체와 무관한 안전장치다.
   startVersionGuard(MODULE_VERSION);
-  startAutoUpdater(MODULE_VERSION);
-
-  createTray();
+  if (!underMaipharmCore()) {
+    startAutoUpdater(MODULE_VERSION);
+    createTray();
+  } else {
+    void startNdsdAgent({
+      version: MODULE_VERSION,
+      onShutdown: () => app.quit(),
+      log: (msg, meta) => console.log(msg, meta ?? ''),
+    });
+  }
 
   // 외부 PMS 가 잡 파일만 떨어뜨리고 떠나도 처리되도록 watcher 가동.
   stopWatcher = startWatcher(onJobFile);
